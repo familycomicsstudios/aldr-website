@@ -272,22 +272,37 @@ leaderboardModalClose.addEventListener('click', () => leaderboardModal.classList
 leaderboardModal.addEventListener('click', e => { 
     if(e.target === leaderboardModal) leaderboardModal.classList.add('hidden'); 
 });
+const leaderboardSelector = document.getElementById('leaderboardSelector');
+leaderboardSelector.addEventListener('change', showLeaderboard);
 
 function showLeaderboard() {
     closeAllModals();
 
-    // Collect all players and their total points
+    const mode = leaderboardSelector.value; // "casual" or "competitive"
+
     const playerMap = {};
+
     levels.forEach(l => {
         l.victors.forEach(player => {
-            if (!playerMap[player]) playerMap[player] = 0;
-            playerMap[player] += l.points;
+            if (!playerMap[player]) playerMap[player] = [];
+            playerMap[player].push(l.points);
         });
     });
 
-    // Convert to array and sort by points descending
+    // Compute total points
     const sortedPlayers = Object.entries(playerMap)
-        .sort((a, b) => b[1] - a[1]);
+        .map(([player, pointsArray]) => {
+            let totalPoints;
+            if (mode === 'competitive') {
+                // Top 5 points only
+                totalPoints = pointsArray.sort((a,b) => b-a).slice(0,5).reduce((acc, p) => acc+p, 0);
+            } else {
+                // Sum all points
+                totalPoints = pointsArray.reduce((acc, p) => acc+p, 0);
+            }
+            return [player, totalPoints];
+        })
+        .sort((a,b) => b[1]-a[1]); // descending
 
     // Render list
     leaderboardList.innerHTML = '';
@@ -307,3 +322,4 @@ function showLeaderboard() {
 
     leaderboardModal.classList.remove('hidden');
 }
+
