@@ -1,0 +1,84 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appel Level Difficulty Rankings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 p-4">
+  <h1 class="text-2xl font-bold mb-4 text-white">Appel Level Difficulty Rankings</h1>
+  <div class="mb-4">
+    <label class="block mb-2 font-semibold text-gray-300">Difficulty Bias Slider (Skill ↔ Learny) <span id="biasLabel" class="ml-2 text-sm font-normal"></span></label>
+    <input id="biasSlider" type="range" min="0" max="100" step="5" value="50" class="w-full">
+  </div>
+  <div class="mb-4 flex gap-4">
+    <label class="flex items-center gap-2 text-gray-300">
+      <input type="checkbox" id="showImpossible" class="form-checkbox">
+      Show Impossible Levels
+    </label>
+    <label class="flex items-center gap-2 text-gray-300">
+      <input type="checkbox" id="showChallenge" class="form-checkbox">
+      Show Challenge Levels
+    </label>
+  </div>
+
+  <table class="min-w-full bg-gray-800 border border-gray-700" id="levelsTable">
+    <thead>
+      <tr class="bg-gray-700">
+        <th class="py-2 px-4 border-b border-gray-600">#</th>
+        <th class="py-2 px-4 border-b border-gray-600">ALDR ID</th>
+        <th class="py-2 px-4 border-b border-gray-600">Level Name</th>
+        <th class="py-2 px-4 border-b border-gray-600">Creator</th>
+        <th class="py-2 px-4 border-b border-gray-600">Punter Scale</th>
+        <th class="py-2 px-4 border-b border-gray-600">List Points</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <!-- Level Modal -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
+      <button id="modalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 id="modalName" class="text-xl font-bold mb-2"></h2>
+      
+      <p id="modalSkillBalanceContainer"><strong>Skills Balance:</strong> <span id="modalSkillBalance"></span></p>
+      <p id="modalProjectContainer"><strong>Project:</strong> <a id="modalProject" class="text-blue-400 hover:underline" href="#" target="_blank"></a></p>
+
+      <div id="modalVideoContainer" class="w-full aspect-video mb-2">
+        <p><strong>Video:</strong></p>
+        <iframe id="modalVideoEmbed" class="w-full h-full rounded" src="" frameborder="0" allowfullscreen></iframe>
+      </div>
+
+
+      <p id="modalNotesContainer"><strong>Notes:</strong> <span id="modalNotes"></span></p>
+
+      <p id="modalCodeContainer"><strong>Level Code:</strong></p>
+      <input id="modalCode" type="text" readonly class="w-full bg-gray-700 text-gray-200 p-1 rounded mt-1">
+
+      <p id="modalVictorsContainer"><strong>Victors:</strong></p>
+      <ul id="modalVictors" class="list-disc ml-5"></ul>
+    </div>
+  </div>
+
+
+  <!-- Player Modal -->
+  <div id="playerModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
+      <button id="playerModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 id="playerName" class="text-xl font-bold mb-2"></h2>
+      <p><strong>Total List Points:</strong> <span id="playerPoints"></span></p>
+      <p><strong>Total Levels Beaten:</strong> <span id="playerLevels"></span></p>
+      <p><strong>Levels:</strong></p>
+      <ul id="playerLevelList" class="list-disc ml-5"></ul>
+    </div>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script src="main.js"></script>
+</body>
+</html>
