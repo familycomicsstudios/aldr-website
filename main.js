@@ -1,6 +1,14 @@
 const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmzFAjjdUVKWhDSLue_SvTQIxT4ZbhlvBa6yc4l4juAZn3HREfvO0VIv2ms98453VItI/pub?gid=0&single=true&output=csv';
 let levels = [];
 
+const searchInput = document.getElementById('searchInput');
+const sortSelect = document.getElementById('sortSelect');
+
+// Re-render table on input
+searchInput.addEventListener('input', renderTable);
+sortSelect.addEventListener('change', renderTable);
+
+
 // Fetch CSV and parse with PapaParse
 fetch(sheetUrl)
     .then(res => res.text())
@@ -59,14 +67,38 @@ function renderTable() {
 
     const showImpossible = showImpossibleEl.checked;
     const showChallenge = showChallengeEl.checked;
+    const searchTerm = searchInput.value.toLowerCase();
+    const sortBy = sortSelect.value;
 
+    // Filter levels by checkbox and search
     const filtered = levels.filter(l => {
         if (!showImpossible && l.impossible) return false;
         if (!showChallenge && l.challenge) return false;
+        if (searchTerm) {
+            const haystack = `${l.name} ${l.creator} ${l.id}`.toLowerCase();
+            if (!haystack.includes(searchTerm)) return false;
+        }
         return true;
     });
 
-    const sorted = [...filtered].sort((a, b) => score(b, bias) - score(a, bias));
+    // Sort levels
+    let sorted;
+    if (sortBy === 'points') {
+        sorted = [...filtered].sort((a, b) => score(b, bias) - score(a, bias));
+    } else if (sortBy === 'name') {
+        sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'creator') {
+        sorted = [...filtered].sort((a, b) => a.creator.localeCompare(b.creator));
+    } else if (sortBy === 'id') {
+    sorted = [...filtered].sort((a, b) => {
+        const idA = parseInt(a.id, 10);
+        const idB = parseInt(b.id, 10);
+        return idA - idB;
+    });
+    } else {
+        sorted = filtered;
+    }
+
     let index = 1;
     sorted.forEach(l => {
         const row = document.createElement('tr');
@@ -81,6 +113,7 @@ function renderTable() {
         tbody.appendChild(row);
     });
 }
+
 
 
 function score(level, bias) {
