@@ -9,6 +9,23 @@
 </head>
 <body class="bg-gray-900 text-gray-200 p-4">
   <h1 class="text-2xl font-bold mb-4 text-white">Appel Level Difficulty Rankings</h1>
+  <p class="text-white">
+    The Appel Level Difficulty Rankings is a list that ranks Appel levels based on their difficulty,
+    with a combination of skills required to beat the level and jumps that you need to learn to beat the level.
+    The list is sorted by a combination of Skill and Learn points, which can be adjusted using the Difficulty Bias slider.
+    Impossible and Challenge levels are hidden by default, but can be shown using the checkboxes below.
+    Click on a level to see more details, including the project, notes, video, victors, and level code.
+    Click on a player in the victors list to see all levels they have beaten.
+  </p><br>
+  <div class="mb-4">
+    <button id="rulesButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
+      Show Rules
+    </button>
+    <button id="leaderboardButton" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">
+      Show Leaderboard
+    </button>
+  </div>
+
   <div class="mb-4">
     <label class="block mb-2 font-semibold text-gray-300">Difficulty Bias Slider (Skill ↔ Learny) <span id="biasLabel" class="ml-2 text-sm font-normal"></span></label>
     <input id="biasSlider" type="range" min="0" max="100" step="5" value="50" class="w-full">
@@ -73,6 +90,47 @@
       <p><strong>Total Levels Beaten:</strong> <span id="playerLevels"></span></p>
       <p><strong>Levels:</strong></p>
       <ul id="playerLevelList" class="list-disc ml-5"></ul>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rulesModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
+      <button id="rulesModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 class="text-xl font-bold mb-4">Appel Level Rankings Rules</h2>
+      <h3 class="text-xl font-bold mb-4">Level Rules</h3>
+      <ul class="list-disc ml-5 space-y-2 text-gray-200">
+        <li>Levels must be made in Appel to be eligible for ranking.</li>
+        <li>Levels must be beatable by at least one person, or they will be marked as Impossible.</li>
+        <li>Levels with low-effort gameplay will be marked as Challenge levels.</li>
+        <li>Levels must have either good gameplay or good decoration. A level with bad gameplay must have good decoration
+          to be ranked, and vice versa. Levels will not be added if they have no effort put into them.
+        </li>
+        <small><li>Levels that are extremely unique or notable may also be placed even if they do not meet quality standards,
+          but this is rare and at the discretion of the list maintainers.
+        </li></small>
+        <li>Levels must be submitted with a replay code from the Appel game, or whatever Appel mod the game was made with.</li>
+        <li>Levels that do not work in the latest version of Appel must have the mod they are made in specified.</li>
+      </ul>
+      <br>
+      <h3 class="text-xl font-bold mb-4">List Points Rules</h3>
+      <ul class="list-disc ml-5 space-y-2 text-gray-200">
+        <li>Levels must be beaten in either vanilla Appel, the mod the level was created in, or a moderator-approved QOL mod.</li>
+        <li>Levels must be beaten without macros or TAS, at 30FPS.</li>
+        <li>Levels must be beaten with no cheats or hacks - the replay must be unaltered and show the entire level being completed.</li>
+        <li>Levels may be beaten as a segmented run starting from a checkpoint, but this is not allowed if the level has any softlocks.</li>
+        <li>If the level's notes specify that the level must be played in the project, the run must be done in that project - not Vanilla Appel
+          nor an approved QOL mod for Vanilla Appel. QOL mods for that specific project are still allowed, however.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div id="leaderboardModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
+      <button id="leaderboardModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 class="text-xl font-bold mb-4">Leaderboard</h2>
+      <ol id="leaderboardList" class="list-decimal ml-5 space-y-2 text-gray-200"></ol>
     </div>
   </div>
 

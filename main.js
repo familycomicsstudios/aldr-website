@@ -35,6 +35,11 @@ document.getElementById('biasSlider').addEventListener('input', () => {
 }); 
 updateBiasLabel();
 
+function displayNumber(num) {
+    return (typeof num === 'number') ? num.toFixed(2) : num;
+}
+
+
 function updateBiasLabel() {
     const bias = document.getElementById('biasSlider').value;
     document.getElementById('biasLabel').innerText = `${bias}% Skill / ${100-bias}% Learn`;
@@ -67,11 +72,11 @@ function renderTable() {
         const row = document.createElement('tr');
         row.className = 'border-b border-gray-700 hover:bg-gray-700 cursor-pointer';
         row.innerHTML = `<td class='py-2 px-4'>${index++}</td>
-                         <td class='py-2 px-4'>${l.id}</td>
-                         <td class='py-2 px-4'>${l.name}</td>
-                         <td class='py-2 px-4'>${l.creator}</td>
-                         <td class='py-2 px-4'>${l.punter}</td>
-                         <td class='py-2 px-4'>${score(l, bias)}</td>`;
+                 <td class='py-2 px-4'>${l.id}</td>
+                 <td class='py-2 px-4'>${l.name}</td>
+                 <td class='py-2 px-4'>${l.creator}</td>
+                 <td class='py-2 px-4'>${displayNumber(l.punter)}</td>
+                 <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
         tbody.appendChild(row);
     });
@@ -96,7 +101,10 @@ const playerModalClose = document.getElementById('playerModalClose');
 function closeAllModals() {
     modal.classList.add('hidden');
     playerModal.classList.add('hidden');
+    rulesModal.classList.add('hidden');
+    leaderboardModal.classList.add('hidden');
 }
+
 
 function showModal(level) {
     closeAllModals();
@@ -106,7 +114,7 @@ function showModal(level) {
     const skillBalanceContainer = document.getElementById('modalSkillBalanceContainer');
     if (level.skillBalance || level.skillBalance === 0) {
         skillBalanceContainer.style.display = 'block';
-        document.getElementById('modalSkillBalance').innerText = level.skillBalance;
+        document.getElementById('modalSkillBalance').innerText = displayNumber(level.skillBalance);
     } else {
         skillBalanceContainer.style.display = 'none';
     }
@@ -183,7 +191,7 @@ function showPlayerModal(playerName) {
     closeAllModals();
     document.getElementById('playerName').innerText = playerName;
     const playerLevels = levels.filter(l => l.victors.includes(playerName));
-    document.getElementById('playerPoints').innerText = playerLevels.reduce((acc, l) => acc + l.points, 0);
+    document.getElementById('playerPoints').innerText = displayNumber(playerLevels.reduce((acc, l) => acc + l.points, 0));
     document.getElementById('playerLevels').innerText = playerLevels.length;
     const ul = document.getElementById('playerLevelList');
     ul.innerHTML = '';
@@ -191,7 +199,7 @@ function showPlayerModal(playerName) {
         const li = document.createElement('li');
         const link = document.createElement('a');
         link.href = '#';
-        link.textContent = `${l.name} (${l.points} pts)`;
+        link.textContent = `${l.name} (${displayNumber(l.points)} pts)`;
         link.className = 'text-blue-400 hover:underline';
         link.addEventListener('click', (e) => { e.preventDefault(); showModal(l); });
         li.appendChild(link);
@@ -209,4 +217,60 @@ function convertYoutubeURL(url) {
     if (!url) return '';
     const match = url.match(/(?:youtu\.be\/|v=)([a-zA-Z0-9_-]{11})/);
     return match ? `https://www.youtube.com/embed/${match[1]}` : '';
+}
+
+const rulesButton = document.getElementById('rulesButton');
+const rulesModal = document.getElementById('rulesModal');
+const rulesModalClose = document.getElementById('rulesModalClose');
+
+rulesButton.addEventListener('click', () => rulesModal.classList.remove('hidden'));
+rulesModalClose.addEventListener('click', () => rulesModal.classList.add('hidden'));
+rulesModal.addEventListener('click', e => { 
+    if(e.target === rulesModal) rulesModal.classList.add('hidden'); 
+});
+
+const leaderboardButton = document.getElementById('leaderboardButton');
+const leaderboardModal = document.getElementById('leaderboardModal');
+const leaderboardModalClose = document.getElementById('leaderboardModalClose');
+const leaderboardList = document.getElementById('leaderboardList');
+
+leaderboardButton.addEventListener('click', () => showLeaderboard());
+leaderboardModalClose.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
+leaderboardModal.addEventListener('click', e => { 
+    if(e.target === leaderboardModal) leaderboardModal.classList.add('hidden'); 
+});
+
+function showLeaderboard() {
+    closeAllModals();
+
+    // Collect all players and their total points
+    const playerMap = {};
+    levels.forEach(l => {
+        l.victors.forEach(player => {
+            if (!playerMap[player]) playerMap[player] = 0;
+            playerMap[player] += l.points;
+        });
+    });
+
+    // Convert to array and sort by points descending
+    const sortedPlayers = Object.entries(playerMap)
+        .sort((a, b) => b[1] - a[1]);
+
+    // Render list
+    leaderboardList.innerHTML = '';
+    sortedPlayers.forEach(([player, points], index) => {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = '#';
+        link.textContent = `${player} (${displayNumber(points)} pts)`;
+        link.className = 'text-blue-400 hover:underline';
+        link.addEventListener('click', (e) => { 
+            e.preventDefault(); 
+            showPlayerModal(player); 
+        });
+        li.appendChild(link);
+        leaderboardList.appendChild(li);
+    });
+
+    leaderboardModal.classList.remove('hidden');
 }
