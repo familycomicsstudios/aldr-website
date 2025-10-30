@@ -294,15 +294,20 @@ function showLeaderboard() {
         .map(([player, pointsArray]) => {
             let totalPoints;
             if (mode === 'competitive') {
-                // Top 5 points only
-                totalPoints = pointsArray.sort((a,b) => b-a).slice(0,5).reduce((acc, p) => acc+p, 0);
+                const hardest = Math.max(...pointsArray);
+                const sorted = [...pointsArray].sort((a,b) => b - a);
+                let multiplier = 1;
+                totalPoints = 0;
+                sorted.forEach(p => {
+                    totalPoints += p * multiplier;
+                    multiplier *= 0.8;
+                });
             } else {
-                // Sum all points
-                totalPoints = pointsArray.reduce((acc, p) => acc+p, 0);
+                totalPoints = pointsArray.reduce((acc, p) => acc + p, 0);
             }
             return [player, totalPoints];
         })
-        .sort((a,b) => b[1]-a[1]); // descending
+        .sort((a, b) => b[1] - a[1]);
 
     // Render list
     leaderboardList.innerHTML = '';
