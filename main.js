@@ -223,23 +223,41 @@ function showModal(level) {
 function showPlayerModal(playerName) {
     closeAllModals();
     document.getElementById('playerName').innerText = playerName;
-    const playerLevels = levels.filter(l => l.victors.includes(playerName));
-    document.getElementById('playerPoints').innerText = displayNumber(playerLevels.reduce((acc, l) => acc + l.points, 0));
-    document.getElementById('playerLevels').innerText = playerLevels.length;
+
+    // find all levels where player appears in victors
+    const playerLevels = levels.filter(l => 
+        l.victors.some(v => v.toLowerCase() === playerName.toLowerCase())
+    );
+
+    // sort levels by List Points (descending)
+    const sortedLevels = [...playerLevels].sort((a, b) => b.points - a.points);
+
+    // calculate totals
+    document.getElementById('playerPoints').innerText = displayNumber(
+        sortedLevels.reduce((acc, l) => acc + l.points, 0)
+    );
+    document.getElementById('playerLevels').innerText = sortedLevels.length;
+
+    // render level list
     const ul = document.getElementById('playerLevelList');
     ul.innerHTML = '';
-    playerLevels.forEach(l => {
+    sortedLevels.forEach(l => {
         const li = document.createElement('li');
         const link = document.createElement('a');
         link.href = '#';
         link.textContent = `${l.name} (${displayNumber(l.points)} pts)`;
         link.className = 'text-blue-400 hover:underline';
-        link.addEventListener('click', (e) => { e.preventDefault(); showModal(l); });
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            showModal(l);
+        });
         li.appendChild(link);
         ul.appendChild(li);
     });
+
     playerModal.classList.remove('hidden');
 }
+
 
 modalClose.addEventListener('click', () => modal.classList.add('hidden'));
 modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
@@ -327,4 +345,69 @@ function showLeaderboard() {
 
     leaderboardModal.classList.remove('hidden');
 }
+
+const completionModal = document.getElementById('completionModal');
+const completionModalClose = document.getElementById('completionModalClose');
+const openCompletionModal = document.getElementById('openCompletionModal');
+const completionForm = document.getElementById('completionForm');
+const completionStatus = document.getElementById('completionStatus');
+
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1433612596593954898/Si_6zkV2Ep99PM5G1tsTcFnaPh1Re5hD4YMW0fEqAl_rCKEdnEcMT_cQ_Z6FsNFReIP3";
+
+openCompletionModal.addEventListener('click', () => {
+    completionModal.classList.remove('hidden');
+    completionStatus.textContent = '';
+});
+
+completionModalClose.addEventListener('click', () => completionModal.classList.add('hidden'));
+completionModal.addEventListener('click', e => {
+    if (e.target === completionModal) completionModal.classList.add('hidden');
+});
+
+completionForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const aldrId = document.getElementById('aldrId').value.trim();
+    const proof = document.getElementById('proof').value.trim();
+    const notes = document.getElementById('notes').value.trim();
+
+    // Lookup level by ID
+    const level = levels.find(l => l.id === aldrId);
+    if (!level) {
+        completionStatus.textContent = "❌ Invalid ALDR ID!";
+        return;
+    }
+
+    completionStatus.textContent = "Sending...";
+
+    try {
+        if (proof.length >= 100) {
+            // Send proof as file
+            const blob = new Blob([proof], { type: "text/plain" });
+            const formData = new FormData();
+            formData.append("payload_json", JSON.stringify({
+                content: `**New Completion Submission**\n**Username:** ${username}\n**Level:** ${level.id} - ${level.name}\n**Notes:** ${notes || "(none)"}`
+            }));
+            formData.append("file", blob, `proof_${username}_${aldrId}.txt`);
+            await fetch(DISCORD_WEBHOOK_URL, { method: "POST", body: formData });
+        } else {
+            // Send as regular message
+            await fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: `**New Completion Submission**\n**Username:** ${username}\n**Level:** ${level.id} - ${level.name}\n**Proof:** ${proof}\n**Notes:** ${notes || "(none)"}`
+                })
+            });
+        }
+
+        completionStatus.textContent = "✅ Submission sent successfully!";
+        completionForm.reset();
+    } catch (err) {
+        console.error(err);
+        completionStatus.textContent = "❌ Failed to send submission.";
+    }
+});
+
 

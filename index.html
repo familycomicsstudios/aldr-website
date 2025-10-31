@@ -31,9 +31,9 @@
     <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"><a href="https://docs.google.com/forms/d/e/1FAIpQLSdipbJrTE5qBR7ZhDc6v3JfVkRGVr01gtKdd83PskX0JMR_tQ/viewform?usp=header">
       Submit a Level
     </a></button>
-    <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"><a href="https://docs.google.com/forms/d/e/1FAIpQLSfUXMYNRgVU4RQZC0RlqL702RzPd69amzDKQgPkMUhCCaH3jg/viewform?usp=header">
+    <button id="openCompletionModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
       Submit a Completion
-    </a></button>
+    </button>
   </div>
 
   <div class="mb-4 flex gap-4 items-center">
@@ -162,6 +162,49 @@
       <ol id="leaderboardList" class="list-decimal ml-5 space-y-2 text-gray-200"></ol>
     </div>
   </div>
+
+  <div id="completionModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
+      <button id="completionModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 class="text-xl font-bold mb-4">Submit a Completion</h2>
+      
+      <form id="completionForm" class="space-y-4">
+        <div>
+          <label class="block font-semibold">Username</label>
+          <input id="username" type="text" maxlength="50" required 
+                 class="w-full p-2 rounded bg-gray-700 text-gray-200" placeholder="Your username">
+        </div>
+
+        <div>
+          <label class="block font-semibold">ALDR ID</label>
+          <input id="aldrId" type="number" max="9999" required 
+                 class="w-full p-2 rounded bg-gray-700 text-gray-200" placeholder="Level ID (e.g., 123)">
+        </div>
+
+        <div>
+          <label class="block font-semibold">Proof of Completion</label>
+          <textarea id="proof" rows="4" maxlength="4000" required
+                    class="w-full p-2 rounded bg-gray-700 text-gray-200"
+                    placeholder="Link or detailed description of proof"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-semibold">Notes (optional)</label>
+          <textarea id="notes" rows="3" maxlength="1000"
+                    class="w-full p-2 rounded bg-gray-700 text-gray-200"
+                    placeholder="Any extra information or comments"></textarea>
+        </div>
+
+        <button type="submit" 
+                class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">
+          Submit Completion
+        </button>
+      </form>
+
+      <p id="completionStatus" class="mt-4 text-sm text-gray-400"></p>
+    </div>
+  </div>
+
 
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
