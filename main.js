@@ -61,6 +61,7 @@ showImpossibleEl.addEventListener('change', renderTable);
 showChallengeEl.addEventListener('change', renderTable);
 
 function renderTable() {
+    console.log("Table rendered")
     const bias = document.getElementById('biasSlider').value;
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
@@ -98,6 +99,8 @@ function renderTable() {
     } else {
         sorted = filtered;
     }
+
+    updateHeaderImage(sorted[0]);
 
     let index = 1;
     sorted.forEach(l => {
@@ -414,4 +417,27 @@ completionForm.addEventListener('submit', async (e) => {
     }
 });
 
+async function updateHeaderImage(topLevel) {
+    if (!topLevel || !topLevel.id) return;
+
+    const imgUrl = `backgrounds/${topLevel.id}.png`;
+
+    console.log("Header image updated")
+
+    // Check if the file exists
+    try {
+        const res = await fetch(imgUrl, { method: "HEAD" });
+        if (!res.ok) return; // image missing → do nothing
+
+        // Apply the image
+        const header = document.getElementById('dynamicHeader');
+        header.style.backgroundImage = `url('${imgUrl}')`;
+
+        // Remove fallback text overlay if present
+        if (header.firstElementChild) header.firstElementChild.style.display = "none";
+
+    } catch (e) {
+        console.warn("Header image missing for ID:", topLevel.id);
+    }
+}
 
