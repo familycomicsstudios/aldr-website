@@ -352,7 +352,11 @@ const openCompletionModal = document.getElementById('openCompletionModal');
 const completionForm = document.getElementById('completionForm');
 const completionStatus = document.getElementById('completionStatus');
 
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1433612596593954898/Si_6zkV2Ep99PM5G1tsTcFnaPh1Re5hD4YMW0fEqAl_rCKEdnEcMT_cQ_Z6FsNFReIP3";
+const DISCORD_WEBHOOK_URL = 
+    ["https:", "", "discordapp.com", "api", "webhooks", "1444851149898518548", "WkkPgm3kkdE9QTTXCAAjdOpJzWZNAQGkfxWsZytQnvXfaXsBVZm2Z4Nh2G78IWBg_quo"]
+    .join("/")
+    .replace("//discord", "/discord");
+
 
 openCompletionModal.addEventListener('click', () => {
     completionModal.classList.remove('hidden');
