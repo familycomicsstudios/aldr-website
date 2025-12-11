@@ -27,6 +27,12 @@
     Join the ALDR Discord server for discussions, suggestions, and more: <a href="https://discord.gg/GZvSKKnHPu" class="text-blue-400 hover:underline">https://discord.gg/GZvSKKnHPu</a>
     <small>If you came here from the Scratch forums, use Discord at your own risk!</small>
   </p><br>
+  <p>Difficulty Scale: <select id="systemSelect" class="p-2 rounded bg-gray-700 text-gray-200">
+    <option value="punter">Punter</option>
+    <option value="scheep">Scheep</option>
+    <option value="michaelchan">MichaelChan</option>
+  </select></p><br>
+
   <div class="mb-4">
     <button id="rulesButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
       Show Rules
@@ -78,7 +84,7 @@
         <th class="py-2 px-4 border-b border-gray-600">ALDR ID</th>
         <th class="py-2 px-4 border-b border-gray-600">Level Name</th>
         <th class="py-2 px-4 border-b border-gray-600">Creator</th>
-        <th class="py-2 px-4 border-b border-gray-600">Punter Scale</th>
+        <th class="py-2 px-4 border-b border-gray-600">Difficulty</th>
         <th class="py-2 px-4 border-b border-gray-600">List Points</th>
       </tr>
     </thead>
@@ -215,6 +221,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <script src="main.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

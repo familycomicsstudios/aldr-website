@@ -1,3 +1,5 @@
+import { convert, toVisual, formatNumber } from './converter.js';
+
 const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmzFAjjdUVKWhDSLue_SvTQIxT4ZbhlvBa6yc4l4juAZn3HREfvO0VIv2ms98453VItI/pub?gid=0&single=true&output=csv';
 let levels = [];
 
@@ -7,6 +9,9 @@ const sortSelect = document.getElementById('sortSelect');
 // Re-render table on input
 searchInput.addEventListener('input', renderTable);
 sortSelect.addEventListener('change', renderTable);
+
+document.getElementById('systemSelect')
+    .addEventListener('change', () => renderTable());
 
 
 // Fetch CSV and parse with PapaParse
@@ -110,7 +115,12 @@ function renderTable() {
                  <td class='py-2 px-4'>${l.id}</td>
                  <td class='py-2 px-4'>${l.name}</td>
                  <td class='py-2 px-4'>${l.creator}</td>
-                 <td class='py-2 px-4'>${displayNumber(l.punter)}</td>
+                 <td>${(() => {
+      const system = document.getElementById('systemSelect').value;
+      const converted = convert(l.punter, 'punter', system);
+      return `${formatNumber(converted)} (${toVisual(converted, system)})`;
+  })()}
+</td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
         tbody.appendChild(row);
