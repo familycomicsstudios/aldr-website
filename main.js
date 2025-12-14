@@ -366,7 +366,7 @@ const completionForm = document.getElementById('completionForm');
 const completionStatus = document.getElementById('completionStatus');
 
 const DISCORD_WEBHOOK_URL = 
-    ["https:", "", "discordapp.com", "api", "webhooks", "1444851149898518548", "WkkPgm3kkdE9QTTXCAAjdOpJzWZNAQGkfxWsZytQnvXfaXsBVZm2Z4Nh2G78IWBg_quo"]
+    ["https://", "discordapp.com", "api", "webhooks", "1444851149898518548", "WkkPgm3kkdE9QTTXCAAjdOpJzWZNAQGkfxWsZytQnvXfaXsBVZm2Z4Nh2G78IWBg_quo"]
     .join("/")
     .replace("//discord", "/discord");
 
