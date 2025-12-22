@@ -331,7 +331,7 @@ function showLeaderboard() {
                 totalPoints = 0;
                 sorted.forEach(p => {
                     totalPoints += p * multiplier;
-                    multiplier *= 0.8;
+                    multiplier *= 0.7;
                 });
             } else {
                 totalPoints = pointsArray.reduce((acc, p) => acc + p, 0);
