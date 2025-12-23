@@ -5,6 +5,37 @@ let levels = [];
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
+const visualModeCheckbox = document.getElementById('visualMode');
+
+function getYoutubeThumbnail(videoUrl) {
+    if (!videoUrl || !videoUrl.trim()) return null;
+    // Handle various YouTube URL formats
+    const match = videoUrl.trim().match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/);
+    return match ? `https://img.youtube.com/vi/${match[1]}/maxresdefault.jpg` : null;
+}
+
+function extractVideoId(videoUrl) {
+    if (!videoUrl || !videoUrl.trim()) return null;
+    // Handle various YouTube URL formats
+    const match = videoUrl.trim().match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+}
+
+function updateTableHeader() {
+    const thead = document.querySelector('#levelsTable thead tr');
+    const isVisualMode = visualModeCheckbox.checked;
+    
+    // Reset header
+    thead.innerHTML = `
+        <th class="py-2 px-4 border-b border-gray-600">#</th>
+        <th class="py-2 px-4 border-b border-gray-600">ALDR ID</th>
+        ${isVisualMode ? '<th class="py-2 px-4 border-b border-gray-600">Thumbnail</th>' : ''}
+        <th class="py-2 px-4 border-b border-gray-600">Level Name</th>
+        <th class="py-2 px-4 border-b border-gray-600">Creator</th>
+        <th class="py-2 px-4 border-b border-gray-600">Difficulty</th>
+        <th class="py-2 px-4 border-b border-gray-600">List Points</th>
+    `;
+}
 
 // Re-render table on input
 searchInput.addEventListener('input', renderTable);
@@ -13,6 +44,13 @@ sortSelect.addEventListener('change', renderTable);
 document.getElementById('systemSelect')
     .addEventListener('change', () => renderTable());
 
+visualModeCheckbox.addEventListener('change', () => {
+    updateTableHeader();
+    renderTable();
+});
+
+// Initialize table header
+updateTableHeader();
 
 // Fetch CSV and parse with PapaParse
 fetch(sheetUrl)
@@ -107,12 +145,37 @@ function renderTable() {
 
     updateHeaderImage(sorted[0]);
 
+    const isVisualMode = visualModeCheckbox.checked;
     let index = 1;
     sorted.forEach(l => {
         const row = document.createElement('tr');
         row.className = 'border-b border-gray-700 hover:bg-gray-700 cursor-pointer';
+        
+        let thumbnailCell = '';
+        if (isVisualMode) {
+            const thumbnailUrl = getYoutubeThumbnail(l.video);
+            if (thumbnailUrl) {
+                thumbnailCell = `
+                    <td class='py-2 px-4'>
+                        <div class="w-48 aspect-video bg-gray-700 rounded overflow-hidden flex items-center justify-center">
+                            <span class="text-gray-400 text-xs">Loading...</span>
+                        </div>
+                    </td>
+                `;
+            } else {
+                thumbnailCell = `
+                    <td class='py-2 px-4'>
+                        <div class="w-48 aspect-video bg-gray-700 rounded overflow-hidden flex items-center justify-center">
+                            <span class="text-gray-400 text-xs">No video</span>
+                        </div>
+                    </td>
+                `;
+            }
+        }
+        
         row.innerHTML = `<td class='py-2 px-4'>${index++}</td>
                  <td class='py-2 px-4'>${l.id}</td>
+                 ${thumbnailCell}
                  <td class='py-2 px-4'>${l.name}</td>
                  <td class='py-2 px-4'>${l.creator}</td>
                  <td>${(() => {
@@ -124,7 +187,100 @@ function renderTable() {
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
         tbody.appendChild(row);
+        
+        // Load thumbnail asynchronously if visual mode is on and video exists
+        if (isVisualMode && l.video && l.video.trim()) {
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                loadThumbnailAsync(row, l.video);
+            }, 0);
+        }
     });
+}
+
+function loadThumbnailAsync(row, videoUrl) {
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) {
+        // If we can't extract video ID, try to find the container and show error
+        const thumbnailCell = row.querySelector('td:nth-child(3)');
+        if (thumbnailCell) {
+            const container = thumbnailCell.querySelector('div');
+            if (container) {
+                container.innerHTML = '<span class="text-gray-400 text-xs">Invalid video URL</span>';
+            }
+        }
+        return;
+    }
+    
+    const thumbnailCell = row.querySelector('td:nth-child(3)');
+    if (!thumbnailCell) {
+        console.warn('Thumbnail cell not found for row');
+        return;
+    }
+    
+    const container = thumbnailCell.querySelector('div');
+    if (!container) {
+        console.warn('Container not found in thumbnail cell');
+        return;
+    }
+    
+    // Try multiple thumbnail formats in order of quality
+    // Skip sddefault as it often shows placeholder images
+    const thumbnailFormats = [
+        'maxresdefault',
+        'hqdefault',
+        'mqdefault'
+    ];
+    
+    let currentFormatIndex = 0;
+    
+    function tryNextFormat() {
+        if (currentFormatIndex >= thumbnailFormats.length) {
+            container.innerHTML = '<span class="text-gray-400 text-xs">No thumbnail</span>';
+            return;
+        }
+        
+        const format = thumbnailFormats[currentFormatIndex];
+        const imgUrl = `https://img.youtube.com/vi/${videoId}/${format}.jpg`;
+        
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        // Set a timeout to prevent hanging
+        const timeout = setTimeout(() => {
+            if (currentFormatIndex < thumbnailFormats.length - 1) {
+                currentFormatIndex++;
+                tryNextFormat();
+            } else {
+                container.innerHTML = '<span class="text-gray-400 text-xs">No thumbnail</span>';
+            }
+        }, 3000);
+        
+        img.onload = () => {
+            clearTimeout(timeout);
+            // Verify the image actually loaded and isn't a placeholder
+            // Check if image dimensions are reasonable (not 120x90 which is placeholder size)
+            if (img.naturalWidth > 120 || img.naturalHeight > 90) {
+                container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+            } else {
+                // Likely a placeholder, try next format
+                clearTimeout(timeout);
+                currentFormatIndex++;
+                setTimeout(tryNextFormat, 50);
+            }
+        };
+        
+        img.onerror = () => {
+            clearTimeout(timeout);
+            currentFormatIndex++;
+            // Try next format with a small delay to avoid rate limiting
+            setTimeout(tryNextFormat, 50);
+        };
+        
+        img.src = imgUrl;
+    }
+    
+    tryNextFormat();
 }
 
 

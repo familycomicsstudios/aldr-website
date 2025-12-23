@@ -27,11 +27,15 @@
     Join the ALDR Discord server for discussions, suggestions, and more: <a href="https://discord.gg/GZvSKKnHPu" class="text-blue-400 hover:underline">https://discord.gg/GZvSKKnHPu</a>
     <small>If you came here from the Scratch forums, use Discord at your own risk!</small>
   </p><br>
-  <p>Difficulty Scale: <select id="systemSelect" class="p-2 rounded bg-gray-700 text-gray-200">
+  <p class="flex gap-4 items-center">Difficulty Scale: <select id="systemSelect" class="p-2 rounded bg-gray-700 text-gray-200">
     <option value="punter">Punter</option>
     <option value="scheep">Scheep</option>
     <option value="michaelchan">MichaelChan</option>
-  </select></p><br>
+  </select>
+  <label class="flex items-center gap-2 text-gray-300">
+    <input type="checkbox" id="visualMode" class="form-checkbox" checked>
+    Show Thumbnails
+  </label></p><br>
 
   <div class="mb-4">
     <button id="rulesButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
