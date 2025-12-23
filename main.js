@@ -9,6 +9,9 @@ const visualModeCheckbox = document.getElementById('visualMode');
 
 function getYoutubeThumbnail(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
+    
+    if (isImageUrl(videoUrl)) return videoUrl; // If it's a direct image URL, use it
+
     // Handle various YouTube URL formats
     const match = videoUrl.trim().match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/);
     return match ? `https://img.youtube.com/vi/${match[1]}/maxresdefault.jpg` : null;
@@ -16,9 +19,16 @@ function getYoutubeThumbnail(videoUrl) {
 
 function extractVideoId(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
+    
+    if (isImageUrl(videoUrl)) return null; // If it's a direct image URL, no video ID to extract
+
     // Handle various YouTube URL formats
     const match = videoUrl.trim().match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/);
     return match ? match[1] : null;
+}
+
+function isImageUrl(url) {
+    return (url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null);
 }
 
 function updateTableHeader() {
@@ -199,6 +209,18 @@ function renderTable() {
 }
 
 function loadThumbnailAsync(row, videoUrl) {
+    // If it's a direct image URL, use it immediately
+    if (isImageUrl(videoUrl)) {
+        const thumbnailCell = row.querySelector('td:nth-child(3)');
+        if (thumbnailCell) {
+            const container = thumbnailCell.querySelector('div');
+            if (container) {
+                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+            }
+        }
+        return;
+    }
+
     const videoId = extractVideoId(videoUrl);
     if (!videoId) {
         // If we can't extract video ID, show default thumbnail
@@ -434,7 +456,7 @@ playerModalClose.addEventListener('click', () => playerModal.classList.add('hidd
 playerModal.addEventListener('click', (e) => { if(e.target === playerModal) playerModal.classList.add('hidden'); });
 
 function convertYoutubeURL(url) {
-    if (!url) return '';
+    if (!url || !url.trim() || isImageUrl(url)) return '';
     const match = url.match(/(?:youtu\.be\/|v=)([a-zA-Z0-9_-]{11})/);
     return match ? `https://www.youtube.com/embed/${match[1]}` : '';
 }
