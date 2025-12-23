@@ -166,7 +166,7 @@ function renderTable() {
                 thumbnailCell = `
                     <td class='py-2 px-4'>
                         <div class="w-48 aspect-video bg-gray-700 rounded overflow-hidden flex items-center justify-center">
-                            <span class="text-gray-400 text-xs">No video</span>
+                            <img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">
                         </div>
                     </td>
                 `;
@@ -201,12 +201,12 @@ function renderTable() {
 function loadThumbnailAsync(row, videoUrl) {
     const videoId = extractVideoId(videoUrl);
     if (!videoId) {
-        // If we can't extract video ID, try to find the container and show error
+        // If we can't extract video ID, show default thumbnail
         const thumbnailCell = row.querySelector('td:nth-child(3)');
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = '<span class="text-gray-400 text-xs">Invalid video URL</span>';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             }
         }
         return;
@@ -236,7 +236,7 @@ function loadThumbnailAsync(row, videoUrl) {
     
     function tryNextFormat() {
         if (currentFormatIndex >= thumbnailFormats.length) {
-            container.innerHTML = '<span class="text-gray-400 text-xs">No thumbnail</span>';
+            container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             return;
         }
         
@@ -252,7 +252,7 @@ function loadThumbnailAsync(row, videoUrl) {
                 currentFormatIndex++;
                 tryNextFormat();
             } else {
-                container.innerHTML = '<span class="text-gray-400 text-xs">No thumbnail</span>';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             }
         }, 3000);
         
