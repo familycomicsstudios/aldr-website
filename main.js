@@ -503,16 +503,25 @@ function showLeaderboard() {
         .map(([player, pointsArray]) => {
             let totalPoints;
             if (mode === 'competitive') {
-                const hardest = Math.max(...pointsArray);
                 const sorted = [...pointsArray].sort((a,b) => b - a);
                 let multiplier = 1;
                 totalPoints = 0;
                 sorted.forEach(p => {
                     totalPoints += p * multiplier;
-                    multiplier *= 0.7;
+                    multiplier *= 0.9; // Competitive multiplier
                 });
+            } else if (mode === 'casual') {
+                const sorted = [...pointsArray].sort((a,b) => b - a);
+                let multiplier = 1;
+                totalPoints = 0;
+                sorted.forEach(p => {
+                    totalPoints += p * multiplier;
+                    multiplier *= 0.95; // Casual multiplier
+                });
+            } else if (mode === 'levelsBeaten') {
+                totalPoints = pointsArray.length; // +1 per level beaten
             } else {
-                totalPoints = pointsArray.reduce((acc, p) => acc + p, 0);
+                totalPoints = pointsArray.reduce((acc, p) => acc + p, 0); // Fallback to sum for unknown modes
             }
             return [player, totalPoints];
         })
@@ -524,7 +533,9 @@ function showLeaderboard() {
         const li = document.createElement('li');
         const link = document.createElement('a');
         link.href = '#';
-        link.textContent = `${player} (${displayNumber(points)} pts)`;
+        const displayedPoints = (mode === 'levelsBeaten') ? Math.round(points) : displayNumber(points);
+        const pointLabel = (mode === 'levelsBeaten') ? (displayedPoints === 1 ? 'level' : 'levels') : 'pts';
+        link.textContent = `${player} (${displayedPoints} ${pointLabel})`;
         link.className = 'text-blue-400 hover:underline';
         link.addEventListener('click', (e) => { 
             e.preventDefault(); 
