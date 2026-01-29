@@ -508,7 +508,7 @@ function showLeaderboard() {
                 totalPoints = 0;
                 sorted.forEach(p => {
                     totalPoints += p * multiplier;
-                    multiplier *= 0.9; // Competitive multiplier
+                    multiplier *= 0.7; // Competitive multiplier
                 });
             } else if (mode === 'casual') {
                 const sorted = [...pointsArray].sort((a,b) => b - a);
@@ -516,7 +516,7 @@ function showLeaderboard() {
                 totalPoints = 0;
                 sorted.forEach(p => {
                     totalPoints += p * multiplier;
-                    multiplier *= 0.95; // Casual multiplier
+                    multiplier *= 0.9; // Casual multiplier
                 });
             } else if (mode === 'levelsBeaten') {
                 totalPoints = pointsArray.length; // +1 per level beaten
