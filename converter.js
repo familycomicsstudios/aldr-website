@@ -34,6 +34,18 @@ const scheepVisuals = [
   [11, "???????"], [12, "Impossible"], [13, "Ascended"], [14, "TAS"], [15, "Cwktao's Wrath"]
 ];
 
+// Grassy visual mapping (based on Punter scale ranges)
+const grassyVisuals = [
+  [0, "Low Beginner"], [1.5, "Medium Beginner"], [2, "High Beginner"],
+  [2.5, "Low Intermediate"], [3, "Medium Intermediate"], [3.25, "High Intermediate"],
+  [3.5, "Low Advanced"], [3.75, "Medium Advanced"], [4, "High Advanced"],
+  [4.5, "Low Expert"], [5.25, "Medium Expert"], [6, "High Expert"],
+  [6.75, "Low Master"], [7, "Medium Master"], [7.25, "High Master"],
+  [7.5, "Low Grandmaster I"], [7.75, "Medium Grandmaster I"], [8, "High Grandmaster I"],
+  [8.5, "Grandmaster II"], [9.5, "Grandmaster III"]
+  // For higher Grandmaster tiers we add logic dynamically
+];
+
 // Helper: format number nicely
 export function formatNumber(num) {
   return parseFloat(num.toFixed(10)).toString();
@@ -105,9 +117,32 @@ export function toVisual(value, system) {
         if (value >= scheepVisuals[i][0]) return scheepVisuals[i][1];
       }
       return formatNumber(value);
+    case 'grassy':
+      // Handle Grandmaster IV and beyond
+      if (value > 10.5) {
+        const tier = Math.floor((value - 8.5) / 1) + 2;
+        return `Grandmaster ${tier >= 4 ? toRoman(tier) : tier}`;
+      }
+      for (let i = grassyVisuals.length-1; i >= 0; i--) {
+        if (value > grassyVisuals[i][0]) return grassyVisuals[i][1];
+      }
+      return formatNumber(value);
     default:
       return formatNumber(value);
   }
+}
+
+// Helper to convert numbers to Roman numerals for Grandmaster tiers
+function toRoman(num) {
+  const lookup = {M:1000, CM:900, D:500, CD:400, C:100, XC:90, L:50, XL:40, X:10, IX:9, V:5, IV:4, I:1};
+  let roman = '';
+  for (let i in lookup) {
+    while (num >= lookup[i]) {
+      roman += i;
+      num -= lookup[i];
+    }
+  }
+  return roman;
 }
 
 // Parse visual input to numeric for a system
@@ -152,9 +187,52 @@ export function visualToNumber(text, system) {
     case 'scheep':
       for (let [val,name] of scheepVisuals) if (name.toLowerCase() === text.toLowerCase()) return val;
       return parseFloat(text);
+    case 'grassy':
+      // Handle Grandmaster I, II, III, IV, etc. (both with and without Low/Medium/High prefix)
+      const gmMatch = text.match(/^(?:Low|Medium|High)?\s*Grandmaster\s+(I+|II+|III+|IV+|V+|VI+|VII+|VIII+|IX+|X+|\d+)$/i);
+      if (gmMatch) {
+        const tierStr = gmMatch[1];
+        let tier;
+        // Try to parse as number first
+        if (/^\d+$/.test(tierStr)) {
+          tier = parseInt(tierStr);
+        } else {
+          // Convert Roman numeral to number
+          tier = fromRoman(tierStr.toUpperCase());
+        }
+        // For tier I (which is 1), we need to check the prefix
+        if (tier === 1) {
+          const prefix = text.match(/^(Low|Medium|High)/i);
+          if (prefix) {
+            const prefixText = prefix[1].toLowerCase();
+            if (prefixText === 'low') return 7.5;
+            if (prefixText === 'medium') return 7.75;
+            if (prefixText === 'high') return 8;
+          }
+        }
+        return 8.5 + (tier - 2) * 1;
+      }
+      for (let [val,name] of grassyVisuals) if (name.toLowerCase() === text.toLowerCase()) return val;
+      return parseFloat(text);
     default:
       return parseFloat(text);
   }
+}
+
+// Helper to convert Roman numerals to numbers
+function fromRoman(str) {
+  const lookup = {I:1, V:5, X:10, L:50, C:100, D:500, M:1000};
+  let num = 0;
+  for (let i = 0; i < str.length; i++) {
+    const curr = lookup[str[i]];
+    const next = lookup[str[i + 1]];
+    if (next && curr < next) {
+      num -= curr;
+    } else {
+      num += curr;
+    }
+  }
+  return num;
 }
 
 // Convert from any system to any other system
@@ -171,6 +249,7 @@ export function convert(value, fromSystem, toSystem) {
     case 'punter': punterValue = numericValue; break;
     case 'michaelchan': punterValue = toPunter(numericValue, michaelChanTable); break;
     case 'scheep': punterValue = toPunter(numericValue, scheepTable); break;
+    case 'grassy': punterValue = numericValue; break; // Grassy is based on Punter scale
   }
 
   // Convert from Punter to target
@@ -179,6 +258,7 @@ export function convert(value, fromSystem, toSystem) {
     case 'punter': result = punterValue; break;
     case 'michaelchan': result = fromPunter(punterValue, michaelChanTable); break;
     case 'scheep': result = fromPunter(punterValue, scheepTable); break;
+    case 'grassy': result = punterValue; break; // Grassy is based on Punter scale
   }
   
   // Round to 2 decimal places for scheep scale

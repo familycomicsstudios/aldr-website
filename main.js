@@ -191,7 +191,14 @@ function renderTable() {
                  <td>${(() => {
       const system = document.getElementById('systemSelect').value;
       const converted = convert(l.punter, 'punter', system);
-      return `${formatNumber(converted)} (${toVisual(converted, system)})`;
+      if (system === 'grassy') {
+        const difficultyText = toVisual(converted, system);
+        if (isVisualMode) {
+          return `<img src="assets/grassy-scale/${difficultyText}.svg" alt="${difficultyText}" class="h-24 inline-block" onerror="this.outerHTML='${difficultyText}'" />`;
+        }
+        return difficultyText;
+      }
+      return `${toVisual(converted, system)} (${formatNumber(converted)})`;
   })()}
 </td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
