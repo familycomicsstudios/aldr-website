@@ -42,7 +42,7 @@ const grassyVisuals = [
   [4.5, "Low Expert"], [5.25, "Medium Expert"], [6, "High Expert"],
   [6.75, "Low Master"], [7, "Medium Master"], [7.25, "High Master"],
   [7.5, "Low Grandmaster I"], [7.75, "Medium Grandmaster I"], [8, "High Grandmaster I"],
-  [8.5, "Grandmaster II"], [9.5, "Grandmaster III"]
+  [8.75, "Grandmaster II"], [9.5, "Grandmaster III"]
   // For higher Grandmaster tiers we add logic dynamically
 ];
 
