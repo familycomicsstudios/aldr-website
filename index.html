@@ -129,6 +129,11 @@
       <h2 id="playerName" class="text-xl font-bold mb-2"></h2>
       <p><strong>Total List Points:</strong> <span id="playerPoints"></span></p>
       <p><strong>Total Levels Beaten:</strong> <span id="playerLevels"></span></p>
+      <button id="makeProfileCardBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded mb-4">Make Profile Card</button>
+      <div id="profileCardContainer" class="mb-4 hidden">
+        <canvas id="profileCardCanvas" class="border-2 border-gray-600 rounded"></canvas>
+        <button id="downloadProfileCardBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded mt-2">Download Profile Card</button>
+      </div>
       <p><strong>Levels:</strong></p>
       <ul id="playerLevelList" class="list-disc ml-5"></ul>
     </div>

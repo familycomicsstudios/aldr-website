@@ -421,6 +421,9 @@ function showModal(level) {
 function showPlayerModal(playerName) {
     closeAllModals();
     document.getElementById('playerName').innerText = playerName;
+    
+    // Hide the profile card when opening a new player
+    document.getElementById('profileCardContainer').classList.add('hidden');
 
     // find all levels where player appears in victors
     const playerLevels = levels.filter(l => 
@@ -431,9 +434,8 @@ function showPlayerModal(playerName) {
     const sortedLevels = [...playerLevels].sort((a, b) => b.points - a.points);
 
     // calculate totals
-    document.getElementById('playerPoints').innerText = displayNumber(
-        sortedLevels.reduce((acc, l) => acc + l.points, 0)
-    );
+    const totalPoints = sortedLevels.reduce((acc, l) => acc + l.points, 0);
+    document.getElementById('playerPoints').innerText = displayNumber(totalPoints);
     document.getElementById('playerLevels').innerText = sortedLevels.length;
 
     // render level list
@@ -453,7 +455,306 @@ function showPlayerModal(playerName) {
         ul.appendChild(li);
     });
 
+    // Setup profile card button
+    const makeProfileCardBtn = document.getElementById('makeProfileCardBtn');
+    makeProfileCardBtn.onclick = () => generateProfileCard(playerName, playerLevels);
+
     playerModal.classList.remove('hidden');
+}
+
+// Generate profile card image
+async function generateProfileCard(playerName, playerLevels) {
+    try {
+        console.log('Generating profile card for:', playerName);
+        
+        // Find user data from sheet using Papa.parse like the main levels loading
+        let scratchUsername = null;
+        let avatarUrl = null;
+        
+        try {
+            console.log('Fetching sheet for user data...');
+            const response = await fetch(sheetUrl);
+            const text = await response.text();
+            
+            console.log('Parsing sheet with Papa.parse...');
+            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+            console.log('Sheet parsed, found', parsed.data.length, 'rows');
+            
+            // Find the user by Tracker Username column
+            for (let row of parsed.data) {
+                console.log('Checking row - Tracker Username:', row['Tracker Username'], 'Scratch Username:', row['Scratch Username']);
+                if (row['Tracker Username']?.toLowerCase() === playerName.toLowerCase()) {
+                    // Try to get Scratch Username, fall back to playerName if empty or missing
+                    const scratchField = row['Scratch Username']?.trim();
+                    scratchUsername = (scratchField && scratchField.length > 0) ? scratchField : playerName;
+                    console.log('Found user! Scratch Username:', scratchUsername);
+                    break;
+                }
+            }
+            
+            // If user not found in sheet, use playerName as fallback
+            if (!scratchUsername) {
+                scratchUsername = playerName;
+            }
+        } catch (e) {
+            console.error('Error fetching/parsing sheet for user data:', e);
+        }
+        
+        console.log('Final Scratch Username:', scratchUsername);
+        
+        // Get Scratch avatar if we have a username
+        if (scratchUsername) {
+            try {
+                console.log('Fetching Scratch user data for:', scratchUsername);
+                // Use CORS proxy to bypass CORS restrictions
+                const scratchResponse = await fetch(`https://corsproxy.io/?https://api.scratch.mit.edu/users/${scratchUsername}`);
+                if (scratchResponse.ok) {
+                    const scratchData = await scratchResponse.json();
+                    console.log('Scratch API response:', scratchData);
+                    if (scratchData.profile && scratchData.profile.images && scratchData.profile.images['90x90']) {
+                        // Use the 90x90 image directly - it's the native square format
+                        avatarUrl = scratchData.profile.images['90x90'].split('?')[0]; // Remove query string
+                        console.log('Got Scratch avatar URL:', avatarUrl);
+                    }
+                } else {
+                    console.log('Scratch API request failed for:', scratchUsername, 'Status:', scratchResponse.status);
+                }
+            } catch (e) {
+                console.error('Error fetching Scratch user data:', e);
+            }
+        }
+        
+        console.log('Final avatar URL:', avatarUrl);
+        
+        // Calculate stats
+        const sortedByPunter = [...playerLevels].sort((a, b) => b.punter - a.punter);
+        const hardestLevel = sortedByPunter[0];
+        const totalPoints = playerLevels.reduce((acc, l) => acc + l.points, 0);
+        
+        // Calculate weighted points (Casual: 90% multiplier stacking, Competitive: 70% multiplier stacking)
+        let casualWeighted = 0, competitiveWeighted = 0;
+        const sortedByPoints = [...playerLevels].sort((a, b) => b.points - a.points);
+        
+        let casualMultiplier = 1, competitiveMultiplier = 1;
+        sortedByPoints.forEach(l => {
+            casualWeighted += l.points * casualMultiplier;
+            casualMultiplier *= 0.9;
+            
+            competitiveWeighted += l.points * competitiveMultiplier;
+            competitiveMultiplier *= 0.7;
+        });
+        
+        // Calculate percentage at each Punter difficulty
+        const difficultyBreakdown = calculateDifficultyBreakdown(playerLevels);
+        
+        // Calculate rankings by comparing against all other players
+        const rankings = calculatePlayerRankings(playerName);
+        
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 650;
+        canvas.height = 350;
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, 650, 350);
+        
+        // Border
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(10, 10, 630, 330);
+        
+        // Draw profile card text and attempt to load avatar
+        drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings);
+        
+        // Try to load and draw avatar
+        if (avatarUrl) {
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    console.log('Avatar image loaded successfully');
+                    // Draw square avatar background
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(30, 30, 100, 100);
+                    ctx.strokeStyle = '#4a9eff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(30, 30, 100, 100);
+                    
+                    // Draw image
+                    ctx.drawImage(img, 30, 30, 100, 100);
+                    
+                    displayCanvas(canvas, playerName);
+                };
+                img.onerror = () => {
+                    console.log('Avatar image failed to load');
+                    // If avatar fails to load, just display card without it
+                    displayCanvas(canvas, playerName);
+                };
+                // Note: Setting src will trigger onload/onerror
+                console.log('Starting avatar image load from:', avatarUrl);
+                img.src = avatarUrl;
+                
+                // Set a timeout in case image loading hangs
+                setTimeout(() => {
+                    if (!img.complete) {
+                        console.log('Avatar image load timeout - displaying card without avatar');
+                        displayCanvas(canvas, playerName);
+                    }
+                }, 3000);
+            } catch (e) {
+                console.log('Error loading avatar:', e.message);
+                displayCanvas(canvas, playerName);
+            }
+        } else {
+            console.log('No avatar URL - displaying card without avatar');
+            displayCanvas(canvas, playerName);
+        }
+    } catch (error) {
+        console.error('Error generating profile card:', error);
+        alert('Error generating profile card. Check console for details.');
+    }
+}
+
+function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings) {
+    // Username
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px Arial';
+    ctx.fillText(playerName, 180, 80);
+    
+    // Hardest completion
+    ctx.font = '18px Arial';
+    ctx.fillStyle = '#b0b0b0';
+    if (hardestLevel) {
+        ctx.fillText(`Hardest: ${hardestLevel.name} (${hardestLevel.punter.toFixed(2)})`, 180, 120);
+    } else {
+        ctx.fillText('Hardest: N/A', 180, 120);
+    }
+    
+    // Stats (Left Column)
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#4a9eff';
+    let y = 160;
+    const lineHeight = 28;
+    
+    ctx.fillText(`Levels Beaten: ${levelCount}`, 50, y);
+    y += lineHeight;
+    ctx.fillText(`Total List Points: ${totalPoints.toFixed(0)}`, 50, y);
+    y += lineHeight;
+    ctx.fillText(`Casual Points: ${casualWeighted.toFixed(0)}`, 50, y);
+    y += lineHeight;
+    ctx.fillText(`Competitive Points: ${competitiveWeighted.toFixed(0)}`, 50, y);
+    
+    // Rankings (Right Column)
+    ctx.font = 'bold 14px Arial';
+    ctx.fillStyle = '#ffcc00';
+    y = 160;
+    
+    ctx.fillText(`Levels Rank: #${rankings.levelsBeatnRank}`, 350, y);
+    y += lineHeight;
+    ctx.fillText(`Total Pts Rank: #${rankings.totalPtsRank}`, 350, y);
+    y += lineHeight;
+    ctx.fillText(`Casual Rank: #${rankings.casualRank}`, 350, y);
+    y += lineHeight;
+    ctx.fillText(`Competitive Rank: #${rankings.competitiveRank}`, 350, y);
+}
+
+function calculatePlayerRankings(playerName) {
+    // Create a map of all players and their stats
+    const playerStats = {};
+    
+    // Get unique players from levels
+    const allPlayers = new Set();
+    levels.forEach(l => {
+        l.victors.forEach(v => allPlayers.add(v.toLowerCase()));
+    });
+    
+    // Calculate stats for each player
+    allPlayers.forEach(player => {
+        const playerLevels = levels.filter(l => 
+            l.victors.some(v => v.toLowerCase() === player.toLowerCase())
+        );
+        
+        const levelsBeat = playerLevels.length;
+        const totalPts = playerLevels.reduce((acc, l) => acc + l.points, 0);
+        
+        // Calculate casual and competitive weighted
+        const sortedByPoints = [...playerLevels].sort((a, b) => b.points - a.points);
+        let casual = 0, competitive = 0;
+        let casualMult = 1, compMult = 1;
+        
+        sortedByPoints.forEach(l => {
+            casual += l.points * casualMult;
+            casualMult *= 0.9;
+            competitive += l.points * compMult;
+            compMult *= 0.7;
+        });
+        
+        playerStats[player] = { levelsBeat, totalPts, casual, competitive };
+    });
+    
+    // Find current player's stats
+    const currentPlayer = playerName.toLowerCase();
+    const currentStats = playerStats[currentPlayer] || { levelsBeat: 0, totalPts: 0, casual: 0, competitive: 0 };
+    
+    // Calculate ranks (1-based)
+    let levelsBeatRank = 1, totalPtsRank = 1, casualRank = 1, competitiveRank = 1;
+    
+    Object.values(playerStats).forEach(stats => {
+        if (stats.levelsBeat > currentStats.levelsBeat) levelsBeatRank++;
+        if (stats.totalPts > currentStats.totalPts) totalPtsRank++;
+        if (stats.casual > currentStats.casual) casualRank++;
+        if (stats.competitive > currentStats.competitive) competitiveRank++;
+    });
+    
+    return {
+        levelsBeatnRank: levelsBeatRank,
+        totalPtsRank: totalPtsRank,
+        casualRank: casualRank,
+        competitiveRank: competitiveRank
+    };
+}
+
+function calculateDifficultyBreakdown(playerLevels) {
+    const breakdown = {};
+    const difficulties = [
+        [0, 1, '0-1'], [1, 2, '1-2'], [2, 3, '2-3'], [3, 4, '3-4'], [4, 5, '4-5'],
+        [5, 6, '5-6'], [6, 7, '6-7'], [7, 8, '7-8'], [8, 9, '8-9'], [9, 10, '9-10'],
+        [10, 11, '10-11'], [11, 12, '11-12'], [12, 13, '12-13'], [13, 14, '13-14'], [14, 15, '14-15']
+    ];
+    
+    difficulties.forEach(([min, max, label]) => {
+        const count = playerLevels.filter(l => l.punter >= min && l.punter < max).length;
+        breakdown[label] = playerLevels.length > 0 ? Math.round((count / playerLevels.length) * 100) : 0;
+    });
+    
+    return breakdown;
+}
+
+function displayCanvas(canvas, playerName) {
+    // Display the canvas in the modal
+    const container = document.getElementById('profileCardContainer');
+    const canvasElement = document.getElementById('profileCardCanvas');
+    
+    // Copy canvas content to the display canvas
+    const ctx = canvasElement.getContext('2d');
+    canvasElement.width = canvas.width;
+    canvasElement.height = canvas.height;
+    ctx.drawImage(canvas, 0, 0);
+    
+    // Show container
+    container.classList.remove('hidden');
+    
+    // Setup download button
+    const downloadBtn = document.getElementById('downloadProfileCardBtn');
+    downloadBtn.onclick = () => downloadCanvasImage(canvas, playerName);
+}
+
+function downloadCanvasImage(canvas, playerName) {
+    const link = document.createElement('a');
+    link.download = `${playerName}-profile-card.png`;
+    link.href = canvas.toDataURL();
+    link.click();
 }
 
 
