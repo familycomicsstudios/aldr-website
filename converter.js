@@ -12,9 +12,9 @@ const michaelChanTable = [
 ];
 
 const scheepTable = [
-  [0, 0], [1, 0.5], [2, 1], [3, 1.5], [4, 2.5], [5, 3],
-  [6, 3.25], [7, 3.5], [7.5, 4], [8, 5], [9, 7], [10, 8],
-  [11, 9], [12, 10], [13, 11], [14, 12], [14.5, 13], [15, 15]
+  [0, 0], [1, 0.5], [2, 1], [3, 2], [4, 3.5], [5, 4],
+  [6, 5], [7, 6], [7.5, 7], [8, 8], [9, 9], [10, 10],
+  [11, 11], [12, 12], [13, 13], [14, 13.5],[15, 15]
 ];
 
 // Punter visual mapping
@@ -174,11 +174,19 @@ export function convert(value, fromSystem, toSystem) {
   }
 
   // Convert from Punter to target
+  let result;
   switch(toSystem) {
-    case 'punter': return punterValue;
-    case 'michaelchan': return fromPunter(punterValue, michaelChanTable);
-    case 'scheep': return fromPunter(punterValue, scheepTable);
+    case 'punter': result = punterValue; break;
+    case 'michaelchan': result = fromPunter(punterValue, michaelChanTable); break;
+    case 'scheep': result = fromPunter(punterValue, scheepTable); break;
   }
+  
+  // Round to 2 decimal places for scheep scale
+  if (toSystem === 'scheep') {
+    result = Math.round(result * 100) / 100;
+  }
+  
+  return result;
 }
 /*
 // Update display in real-time
