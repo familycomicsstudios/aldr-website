@@ -480,29 +480,31 @@ function showPlayerModal(playerName) {
 }
 
 async function fetchScratchUserData(scratchUsername) {
-    const targetUrl = `https://api.scratch.mit.edu/users/${scratchUsername}`;
-    const encoded = encodeURIComponent(targetUrl);
-    const urls = [
-        targetUrl,
-        `https://corsproxy.io/?${encoded}`,
-        `https://cors.isomorphic-git.org/${targetUrl}`,
-        `https://api.allorigins.win/raw?url=${encoded}`
-    ];
-
-    for (const url of urls) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                console.log('Scratch API request failed:', url, 'Status:', response.status);
-                continue;
+    try {
+        // Use corsproxy.io - the only working proxy, with proper URL encoding
+        const targetUrl = `https://api.scratch.mit.edu/users/${scratchUsername}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        
+        console.log('Fetching from:', proxyUrl);
+        const response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
             }
-            return await response.json();
-        } catch (e) {
-            console.log('Scratch API request error:', url, e.message);
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Scratch data fetched successfully');
+            return data;
+        } else {
+            console.log('Scratch API proxy failed with status:', response.status);
+            return null;
         }
+    } catch (e) {
+        console.error('Error fetching from corsproxy:', e.message);
+        return null;
     }
-
-    return null;
 }
 
 // Generate profile card image
