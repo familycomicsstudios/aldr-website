@@ -265,7 +265,7 @@ function loadThumbnailAsync(row, videoUrl) {
     
     function tryNextFormat() {
         if (currentFormatIndex >= thumbnailFormats.length) {
-            container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
+            container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-contain">';
             return;
         }
         
@@ -281,7 +281,7 @@ function loadThumbnailAsync(row, videoUrl) {
                 currentFormatIndex++;
                 tryNextFormat();
             } else {
-                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-contain">';
             }
         }, 3000);
         
@@ -290,7 +290,7 @@ function loadThumbnailAsync(row, videoUrl) {
             // Verify the image actually loaded and isn't a placeholder
             // Check if image dimensions are reasonable (not 120x90 which is placeholder size)
             if (img.naturalWidth > 120 || img.naturalHeight > 90) {
-                container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+                container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="w-full h-full object-contain">`;
             } else {
                 // Likely a placeholder, try next format
                 clearTimeout(timeout);
