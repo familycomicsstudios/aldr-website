@@ -176,7 +176,7 @@ function renderTable() {
                 thumbnailCell = `
                     <td class='py-2 px-4'>
                         <div class="w-48 aspect-video bg-gray-700 rounded overflow-hidden flex items-center justify-center">
-                            <img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">
+                            <img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-contain">
                         </div>
                     </td>
                 `;
@@ -222,7 +222,7 @@ function loadThumbnailAsync(row, videoUrl) {
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-contain">`;
             }
         }
         return;
@@ -235,7 +235,7 @@ function loadThumbnailAsync(row, videoUrl) {
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-contain">';
             }
         }
         return;
