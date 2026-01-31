@@ -134,7 +134,13 @@
         <canvas id="profileCardCanvas" class="rounded"></canvas>
         <button id="downloadProfileCardBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded mt-2">Download Profile Card</button>
       </div>
-      <p><strong>Levels:</strong></p>
+      <div class="flex items-center gap-2 mb-2">
+        <p><strong id="playerLevelListLabel">Levels (Cleared):</strong></p>
+        <select id="playerLevelFilter" class="p-1 rounded bg-gray-700 text-gray-200">
+          <option value="cleared">Cleared</option>
+          <option value="uncleared">Uncleared</option>
+        </select>
+      </div>
       <ul id="playerLevelList" class="list-disc ml-5"></ul>
     </div>
   </div>

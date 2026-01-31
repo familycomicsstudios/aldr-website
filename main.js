@@ -438,22 +438,39 @@ function showPlayerModal(playerName) {
     document.getElementById('playerPoints').innerText = displayNumber(totalPoints);
     document.getElementById('playerLevels').innerText = sortedLevels.length;
 
-    // render level list
-    const ul = document.getElementById('playerLevelList');
-    ul.innerHTML = '';
-    sortedLevels.forEach(l => {
-        const li = document.createElement('li');
-        const link = document.createElement('a');
-        link.href = '#';
-        link.textContent = `${l.name} (${displayNumber(l.points)} pts)`;
-        link.className = 'text-blue-400 hover:underline';
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            showModal(l);
+    const levelFilter = document.getElementById('playerLevelFilter');
+    const levelListLabel = document.getElementById('playerLevelListLabel');
+    levelFilter.value = 'cleared';
+
+    const renderPlayerLevelList = () => {
+        const showUncleared = levelFilter.value === 'uncleared';
+        const ul = document.getElementById('playerLevelList');
+        ul.innerHTML = '';
+
+        const listLevels = showUncleared
+            ? levels.filter(l => !l.victors.some(v => v.toLowerCase() === playerName.toLowerCase()))
+            : sortedLevels;
+
+        const sortedListLevels = [...listLevels].sort((a, b) => b.points - a.points);
+        levelListLabel.textContent = showUncleared ? 'Levels (Uncleared):' : 'Levels (Cleared):';
+
+        sortedListLevels.forEach(l => {
+            const li = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = '#';
+            link.textContent = `${l.name} (${displayNumber(l.points)} pts)`;
+            link.className = 'text-blue-400 hover:underline';
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                showModal(l);
+            });
+            li.appendChild(link);
+            ul.appendChild(li);
         });
-        li.appendChild(link);
-        ul.appendChild(li);
-    });
+    };
+
+    levelFilter.onchange = renderPlayerLevelList;
+    renderPlayerLevelList();
 
     // Setup profile card button
     const makeProfileCardBtn = document.getElementById('makeProfileCardBtn');
