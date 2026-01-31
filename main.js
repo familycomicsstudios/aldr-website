@@ -462,6 +462,32 @@ function showPlayerModal(playerName) {
     playerModal.classList.remove('hidden');
 }
 
+async function fetchScratchUserData(scratchUsername) {
+    const targetUrl = `https://api.scratch.mit.edu/users/${scratchUsername}`;
+    const encoded = encodeURIComponent(targetUrl);
+    const urls = [
+        targetUrl,
+        `https://corsproxy.io/?${encoded}`,
+        `https://cors.isomorphic-git.org/${targetUrl}`,
+        `https://api.allorigins.win/raw?url=${encoded}`
+    ];
+
+    for (const url of urls) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.log('Scratch API request failed:', url, 'Status:', response.status);
+                continue;
+            }
+            return await response.json();
+        } catch (e) {
+            console.log('Scratch API request error:', url, e.message);
+        }
+    }
+
+    return null;
+}
+
 // Generate profile card image
 async function generateProfileCard(playerName, playerLevels) {
     try {
@@ -506,18 +532,16 @@ async function generateProfileCard(playerName, playerLevels) {
         if (scratchUsername) {
             try {
                 console.log('Fetching Scratch user data for:', scratchUsername);
-                // Use CORS proxy to bypass CORS restrictions
-                const scratchResponse = await fetch(`https://corsproxy.io/?https://api.scratch.mit.edu/users/${scratchUsername}`);
-                if (scratchResponse.ok) {
-                    const scratchData = await scratchResponse.json();
+                const scratchData = await fetchScratchUserData(scratchUsername);
+                if (scratchData) {
                     console.log('Scratch API response:', scratchData);
                     if (scratchData.profile && scratchData.profile.images && scratchData.profile.images['90x90']) {
                         // Use the 90x90 image directly - it's the native square format
-                        avatarUrl = scratchData.profile.images['90x90'].split('?')[0]; // Remove query string
+                        avatarUrl = scratchData.profile.images['90x90'].split('?')[0];
                         console.log('Got Scratch avatar URL:', avatarUrl);
                     }
                 } else {
-                    console.log('Scratch API request failed for:', scratchUsername, 'Status:', scratchResponse.status);
+                    console.log('Scratch API request failed for:', scratchUsername);
                 }
             } catch (e) {
                 console.error('Error fetching Scratch user data:', e);
@@ -553,17 +577,25 @@ async function generateProfileCard(playerName, playerLevels) {
         // Create canvas
         const canvas = document.createElement('canvas');
         canvas.width = 650;
-        canvas.height = 350;
+        canvas.height = 300;
         const ctx = canvas.getContext('2d');
+
+        // Load stat icons before drawing
+        await loadStatIcons();
         
-        // Background
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, 650, 350);
+        // Background (gradient)
+        const bgGradient = ctx.createLinearGradient(0, 0, 650, 300);
+        bgGradient.addColorStop(0, '#0f172a');
+        bgGradient.addColorStop(0.5, '#1e293b');
+        bgGradient.addColorStop(1, '#0b1020');
+        ctx.fillStyle = bgGradient;
+        drawRoundedRect(ctx, 0, 0, 650, 300, 22, true, false);
         
-        // Border
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(10, 10, 630, 330);
+        // Inner card panel
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        drawRoundedRect(ctx, 12, 12, 626, 276, 18, true, false);
+        
+        // Accent border removed
         
         // Draw profile card text and attempt to load avatar
         drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings);
@@ -618,45 +650,138 @@ async function generateProfileCard(playerName, playerLevels) {
 
 function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings) {
     // Username
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px Arial';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 34px "Trebuchet MS", "Segoe UI", Arial';
     ctx.fillText(playerName, 180, 80);
     
     // Hardest completion
-    ctx.font = '18px Arial';
-    ctx.fillStyle = '#b0b0b0';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 18px "Trebuchet MS", "Segoe UI", Arial';
+    const hardestLabel = 'Hardest:';
+    const labelWidth = ctx.measureText(hardestLabel).width;
+    ctx.fillText(hardestLabel, 180, 120);
+    ctx.font = '16px "Trebuchet MS", "Segoe UI", Arial';
+    const valueX = 180 + labelWidth + 8;
     if (hardestLevel) {
-        ctx.fillText(`Hardest: ${hardestLevel.name} (${hardestLevel.punter.toFixed(2)})`, 180, 120);
+        ctx.fillText(`${hardestLevel.name} (${hardestLevel.punter.toFixed(2)})`, valueX, 120);
     } else {
-        ctx.fillText('Hardest: N/A', 180, 120);
+        ctx.fillText('N/A', valueX, 120);
     }
     
     // Stats (Left Column)
-    ctx.font = 'bold 18px Arial';
-    ctx.fillStyle = '#4a9eff';
+    ctx.font = 'bold 16px "Trebuchet MS", "Segoe UI", Arial';
+    ctx.fillStyle = '#7dd3fc';
     let y = 160;
     const lineHeight = 28;
-    
-    ctx.fillText(`Levels Beaten: ${levelCount}`, 50, y);
+    const iconX = 30;
+    const iconSize = 20;
+    const iconPadding = 10;
+    const textX = iconX + iconSize + iconPadding;
+
+    // Icons + labels (Left Column)
+    drawStatIcon(ctx, iconX, y - 14, iconSize, 'trophy');
+    ctx.fillText(`Levels Beaten: ${levelCount}`, textX, y);
     y += lineHeight;
-    ctx.fillText(`Total List Points: ${totalPoints.toFixed(0)}`, 50, y);
+    drawStatIcon(ctx, iconX, y - 14, iconSize, 'graph');
+    ctx.fillText(`Total List Points: ${totalPoints.toFixed(0)}`, textX, y);
     y += lineHeight;
-    ctx.fillText(`Casual Points: ${casualWeighted.toFixed(0)}`, 50, y);
+    drawStatIcon(ctx, iconX, y - 14, iconSize, 'map');
+    ctx.fillText(`Casual Points: ${casualWeighted.toFixed(0)}`, textX, y);
     y += lineHeight;
-    ctx.fillText(`Competitive Points: ${competitiveWeighted.toFixed(0)}`, 50, y);
+    drawStatIcon(ctx, iconX, y - 14, iconSize, 'clipboard');
+    ctx.fillText(`Competitive Points: ${competitiveWeighted.toFixed(0)}`, textX, y);
     
     // Rankings (Right Column)
-    ctx.font = 'bold 14px Arial';
-    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 14px "Trebuchet MS", "Segoe UI", Arial';
+    ctx.fillStyle = '#f8fafc';
     y = 160;
-    
-    ctx.fillText(`Levels Rank: #${rankings.levelsBeatnRank}`, 350, y);
+
+    drawRankPill(ctx, 330, y - 16, `Levels Rank`, `#${rankings.levelsBeatnRank}`);
     y += lineHeight;
-    ctx.fillText(`Total Pts Rank: #${rankings.totalPtsRank}`, 350, y);
+    drawRankPill(ctx, 330, y - 16, `Total Pts Rank`, `#${rankings.totalPtsRank}`);
     y += lineHeight;
-    ctx.fillText(`Casual Rank: #${rankings.casualRank}`, 350, y);
+    drawRankPill(ctx, 330, y - 16, `Casual Rank`, `#${rankings.casualRank}`);
     y += lineHeight;
-    ctx.fillText(`Competitive Rank: #${rankings.competitiveRank}`, 350, y);
+    drawRankPill(ctx, 330, y - 16, `Competitive Rank`, `#${rankings.competitiveRank}`);
+}
+
+function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+}
+
+const statIconPaths = {
+    trophy: 'assets/icons/trophy.svg',
+    graph: 'assets/icons/graph-up.svg',
+    map: 'assets/icons/map.svg',
+    clipboard: 'assets/icons/clipboard-check.svg'
+};
+
+const statIcons = {};
+let statIconsLoaded = false;
+
+async function loadStatIcons() {
+    if (statIconsLoaded) return;
+    const entries = Object.entries(statIconPaths);
+    await Promise.all(entries.map(([key, src]) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            statIcons[key] = img;
+            resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = src;
+    })));
+    statIconsLoaded = true;
+}
+
+function drawStatIcon(ctx, x, y, size, type) {
+    const img = statIcons[type];
+    if (img) {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = size;
+        offscreen.height = size;
+        const octx = offscreen.getContext('2d');
+        octx.drawImage(img, 0, 0, size, size);
+        octx.globalCompositeOperation = 'source-in';
+        octx.fillStyle = '#ffffff';
+        octx.fillRect(0, 0, size, size);
+        ctx.drawImage(offscreen, x, y);
+        return;
+    }
+    // Fallback placeholder
+    ctx.save();
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+    ctx.fillRect(x, y, size, size);
+    ctx.restore();
+}
+
+function drawRankPill(ctx, x, y, label, value) {
+    ctx.save();
+    const width = 260;
+    const height = 24;
+    const pillGradient = ctx.createLinearGradient(x, y, x + width, y);
+    pillGradient.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
+    pillGradient.addColorStop(1, 'rgba(167, 139, 250, 0.18)');
+    ctx.fillStyle = pillGradient;
+    drawRoundedRect(ctx, x, y, width, height, 12, true, false);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, x, y, width, height, 12, false, true);
+    ctx.fillStyle = '#cbd5f5';
+    ctx.font = 'bold 12px "Trebuchet MS", "Segoe UI", Arial';
+    ctx.fillText(label, x + 10, y + 16);
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 12px "Trebuchet MS", "Segoe UI", Arial';
+    ctx.fillText(value, x + 190, y + 16);
+    ctx.restore();
 }
 
 function calculatePlayerRankings(playerName) {
