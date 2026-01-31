@@ -481,28 +481,23 @@ function showPlayerModal(playerName) {
 
 async function fetchScratchUserData(scratchUsername) {
     try {
-        // Use corsproxy.io - the only working proxy, with proper URL encoding
+        // Use codetabs.com proxy which is free and reliable
         const targetUrl = `https://api.scratch.mit.edu/users/${scratchUsername}`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
         
-        console.log('Fetching from:', proxyUrl);
-        const response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        console.log('Fetching Scratch user data via codetabs');
+        const response = await fetch(proxyUrl);
         
         if (response.ok) {
-            const data = await response.json();
+            const scratchData = await response.json();
             console.log('Scratch data fetched successfully');
-            return data;
+            return scratchData;
         } else {
             console.log('Scratch API proxy failed with status:', response.status);
             return null;
         }
     } catch (e) {
-        console.error('Error fetching from corsproxy:', e.message);
+        console.error('Error fetching from codetabs:', e.message);
         return null;
     }
 }
