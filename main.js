@@ -435,8 +435,10 @@ function showPlayerModal(playerName) {
 
     // calculate totals
     const totalPoints = sortedLevels.reduce((acc, l) => acc + l.points, 0);
+    const skill = calculateSkill(playerLevels);
     document.getElementById('playerPoints').innerText = displayNumber(totalPoints);
     document.getElementById('playerLevels').innerText = sortedLevels.length;
+    document.getElementById('playerSkill').innerText = displayNumber(skill);
 
     const levelFilter = document.getElementById('playerLevelFilter');
     const levelListLabel = document.getElementById('playerLevelListLabel');
@@ -568,6 +570,7 @@ async function generateProfileCard(playerName, playerLevels) {
         const sortedByPunter = [...playerLevels].sort((a, b) => b.punter - a.punter);
         const hardestLevel = sortedByPunter[0];
         const totalPoints = playerLevels.reduce((acc, l) => acc + l.points, 0);
+        const skill = calculateSkill(playerLevels);
         
         // Calculate weighted points (Casual: 90% multiplier stacking, Competitive: 70% multiplier stacking)
         let casualWeighted = 0, competitiveWeighted = 0;
@@ -612,7 +615,7 @@ async function generateProfileCard(playerName, playerLevels) {
         // Accent border removed
         
         // Draw profile card text and attempt to load avatar
-        drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings);
+        drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings);
         
         // Try to load and draw avatar
         if (avatarUrl) {
@@ -662,7 +665,7 @@ async function generateProfileCard(playerName, playerLevels) {
     }
 }
 
-function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, difficultyBreakdown, rankings) {
+function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings) {
     // Username
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 34px "Trebuchet MS", "Segoe UI", Arial';
@@ -704,6 +707,9 @@ function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoi
     y += lineHeight;
     drawStatIcon(ctx, iconX, y - 14, iconSize, 'clipboard');
     ctx.fillText(`Competitive Points: ${competitiveWeighted.toFixed(0)}`, textX, y);
+    y += lineHeight;
+    drawStatIcon(ctx, iconX, y - 14, iconSize, 'graph');
+    ctx.fillText(`Skill: ${skill.toFixed(2)}`, textX, y);
     
     // Rankings (Right Column)
     ctx.font = 'bold 14px "Trebuchet MS", "Segoe UI", Arial';
@@ -796,6 +802,15 @@ function drawRankPill(ctx, x, y, label, value) {
     ctx.font = 'bold 12px "Trebuchet MS", "Segoe UI", Arial';
     ctx.fillText(value, x + 190, y + 16);
     ctx.restore();
+}
+
+function calculateSkill(playerLevels) {
+    const topLevels = [...playerLevels]
+        .sort((a, b) => b.punter - a.punter)
+        .slice(0, 5);
+    if (topLevels.length === 0) return 0;
+    const total = topLevels.reduce((acc, l) => acc + l.punter, 0);
+    return total / topLevels.length;
 }
 
 function calculatePlayerRankings(playerName) {
