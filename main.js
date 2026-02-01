@@ -594,23 +594,23 @@ async function generateProfileCard(playerName, playerLevels) {
         // Create canvas
         const canvas = document.createElement('canvas');
         canvas.width = 650;
-        canvas.height = 300;
+        canvas.height = 315;
         const ctx = canvas.getContext('2d');
 
         // Load stat icons before drawing
         await loadStatIcons();
         
         // Background (gradient)
-        const bgGradient = ctx.createLinearGradient(0, 0, 650, 300);
+        const bgGradient = ctx.createLinearGradient(0, 0, 650, 315);
         bgGradient.addColorStop(0, '#0f172a');
         bgGradient.addColorStop(0.5, '#1e293b');
         bgGradient.addColorStop(1, '#0b1020');
         ctx.fillStyle = bgGradient;
-        drawRoundedRect(ctx, 0, 0, 650, 300, 22, true, false);
+        drawRoundedRect(ctx, 0, 0, 650, 315, 22, true, false);
         
         // Inner card panel
         ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        drawRoundedRect(ctx, 12, 12, 626, 276, 18, true, false);
+        drawRoundedRect(ctx, 12, 12, 626, 291, 18, true, false);
         
         // Accent border removed
         
@@ -723,6 +723,8 @@ function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoi
     drawRankPill(ctx, 330, y - 16, `Casual Rank`, `#${rankings.casualRank}`);
     y += lineHeight;
     drawRankPill(ctx, 330, y - 16, `Competitive Rank`, `#${rankings.competitiveRank}`);
+    y += lineHeight;
+    drawRankPill(ctx, 330, y - 16, `Skill Rank`, `#${rankings.skillRank}`);
 }
 
 function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke) {
@@ -810,7 +812,7 @@ function calculateSkill(playerLevels) {
         .slice(0, 5);
     if (topLevels.length === 0) return 0;
     const total = topLevels.reduce((acc, l) => acc + l.punter, 0);
-    return total / topLevels.length;
+    return total / 5;
 }
 
 function calculatePlayerRankings(playerName) {
@@ -831,6 +833,7 @@ function calculatePlayerRankings(playerName) {
         
         const levelsBeat = playerLevels.length;
         const totalPts = playerLevels.reduce((acc, l) => acc + l.points, 0);
+        const skill = calculateSkill(playerLevels);
         
         // Calculate casual and competitive weighted
         const sortedByPoints = [...playerLevels].sort((a, b) => b.points - a.points);
@@ -844,28 +847,30 @@ function calculatePlayerRankings(playerName) {
             compMult *= 0.7;
         });
         
-        playerStats[player] = { levelsBeat, totalPts, casual, competitive };
+        playerStats[player] = { levelsBeat, totalPts, casual, competitive, skill };
     });
     
     // Find current player's stats
     const currentPlayer = playerName.toLowerCase();
-    const currentStats = playerStats[currentPlayer] || { levelsBeat: 0, totalPts: 0, casual: 0, competitive: 0 };
+    const currentStats = playerStats[currentPlayer] || { levelsBeat: 0, totalPts: 0, casual: 0, competitive: 0, skill: 0 };
     
     // Calculate ranks (1-based)
-    let levelsBeatRank = 1, totalPtsRank = 1, casualRank = 1, competitiveRank = 1;
+    let levelsBeatRank = 1, totalPtsRank = 1, casualRank = 1, competitiveRank = 1, skillRank = 1;
     
     Object.values(playerStats).forEach(stats => {
         if (stats.levelsBeat > currentStats.levelsBeat) levelsBeatRank++;
         if (stats.totalPts > currentStats.totalPts) totalPtsRank++;
         if (stats.casual > currentStats.casual) casualRank++;
         if (stats.competitive > currentStats.competitive) competitiveRank++;
+        if (stats.skill > currentStats.skill) skillRank++;
     });
     
     return {
         levelsBeatnRank: levelsBeatRank,
         totalPtsRank: totalPtsRank,
         casualRank: casualRank,
-        competitiveRank: competitiveRank
+        competitiveRank: competitiveRank,
+        skillRank: skillRank
     };
 }
 
@@ -956,16 +961,16 @@ function showLeaderboard() {
     levels.forEach(l => {
         l.victors.forEach(player => {
             if (!playerMap[player]) playerMap[player] = [];
-            playerMap[player].push(l.points);
+            playerMap[player].push(l);
         });
     });
 
     // Compute total points
     const sortedPlayers = Object.entries(playerMap)
-        .map(([player, pointsArray]) => {
+        .map(([player, playerLevels]) => {
             let totalPoints;
             if (mode === 'competitive') {
-                const sorted = [...pointsArray].sort((a,b) => b - a);
+                const sorted = [...playerLevels].map(l => l.points).sort((a,b) => b - a);
                 let multiplier = 1;
                 totalPoints = 0;
                 sorted.forEach(p => {
@@ -973,7 +978,7 @@ function showLeaderboard() {
                     multiplier *= 0.7; // Competitive multiplier
                 });
             } else if (mode === 'casual') {
-                const sorted = [...pointsArray].sort((a,b) => b - a);
+                const sorted = [...playerLevels].map(l => l.points).sort((a,b) => b - a);
                 let multiplier = 1;
                 totalPoints = 0;
                 sorted.forEach(p => {
@@ -981,9 +986,11 @@ function showLeaderboard() {
                     multiplier *= 0.9; // Casual multiplier
                 });
             } else if (mode === 'levelsBeaten') {
-                totalPoints = pointsArray.length; // +1 per level beaten
+                totalPoints = playerLevels.length; // +1 per level beaten
+            } else if (mode === 'skill') {
+                totalPoints = calculateSkill(playerLevels);
             } else {
-                totalPoints = pointsArray.reduce((acc, p) => acc + p, 0); // Fallback to sum for unknown modes
+                totalPoints = playerLevels.reduce((acc, l) => acc + l.points, 0); // Fallback to sum for unknown modes
             }
             return [player, totalPoints];
         })
@@ -995,8 +1002,12 @@ function showLeaderboard() {
         const li = document.createElement('li');
         const link = document.createElement('a');
         link.href = '#';
-        const displayedPoints = (mode === 'levelsBeaten') ? Math.round(points) : displayNumber(points);
-        const pointLabel = (mode === 'levelsBeaten') ? (displayedPoints === 1 ? 'level' : 'levels') : 'pts';
+        const displayedPoints = (mode === 'levelsBeaten')
+            ? Math.round(points)
+            : (mode === 'skill' ? points.toFixed(2) : displayNumber(points));
+        const pointLabel = (mode === 'levelsBeaten')
+            ? (displayedPoints === 1 ? 'level' : 'levels')
+            : (mode === 'skill' ? 'skill' : 'pts');
         link.textContent = `${player} (${displayedPoints} ${pointLabel})`;
         link.className = 'text-blue-400 hover:underline';
         link.addEventListener('click', (e) => { 
