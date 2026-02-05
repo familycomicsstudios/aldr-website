@@ -176,7 +176,7 @@ function renderTable() {
                 thumbnailCell = `
                     <td class='py-2 px-4'>
                         <div class="w-48 aspect-video bg-gray-700 rounded overflow-hidden flex items-center justify-center">
-                            <img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="max-w-full max-h-full object-contain">
+                            <img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">
                         </div>
                     </td>
                 `;
@@ -222,7 +222,7 @@ function loadThumbnailAsync(row, videoUrl) {
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="max-w-full max-h-full object-contain">`;
+                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
             }
         }
         return;
@@ -235,7 +235,7 @@ function loadThumbnailAsync(row, videoUrl) {
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="max-w-full max-h-full object-contain">';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             }
         }
         return;
@@ -265,7 +265,7 @@ function loadThumbnailAsync(row, videoUrl) {
     
     function tryNextFormat() {
         if (currentFormatIndex >= thumbnailFormats.length) {
-            container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="max-w-full max-h-full object-contain">';
+            container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             return;
         }
         
@@ -281,7 +281,7 @@ function loadThumbnailAsync(row, videoUrl) {
                 currentFormatIndex++;
                 tryNextFormat();
             } else {
-                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-contain">';
+                container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             }
         }, 3000);
         
@@ -290,7 +290,7 @@ function loadThumbnailAsync(row, videoUrl) {
             // Verify the image actually loaded and isn't a placeholder
             // Check if image dimensions are reasonable (not 120x90 which is placeholder size)
             if (img.naturalWidth > 120 || img.naturalHeight > 90) {
-                container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="max-w-full max-h-full object-contain">`;
+                container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
             } else {
                 // Likely a placeholder, try next format
                 clearTimeout(timeout);
