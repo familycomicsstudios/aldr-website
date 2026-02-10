@@ -62,7 +62,7 @@ export function punterPrefix(value) {
   // Baseline at .00, Skyline at .99
   const BASELINE_TOLERANCE = 0.01;
   const SKYLINE_TOLERANCE = 0.01;
-  if (frac <= BASELINE_TOLERANCE) return "Baseline ";
+  if (frac < BASELINE_TOLERANCE) return "Baseline ";
   if (frac >= 0.99 - SKYLINE_TOLERANCE) return "Skyline ";
 
   // Subdifficulty bands shifted +0.5 compared to previous logic
