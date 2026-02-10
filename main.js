@@ -1,4 +1,4 @@
-import { convert, toVisual, formatNumber } from './converter.js';
+import { convert, toVisual, formatNumber, formatPunterNumber } from './converter.js';
 
 const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmzFAjjdUVKWhDSLue_SvTQIxT4ZbhlvBa6yc4l4juAZn3HREfvO0VIv2ms98453VItI/pub?gid=0&single=true&output=csv';
 let levels = [];
@@ -198,7 +198,8 @@ function renderTable() {
         }
         return difficultyText;
       }
-      return `${toVisual(converted, system)} (${formatNumber(converted)})`;
+            const numericText = system === 'punter' ? formatPunterNumber(converted) : formatNumber(converted);
+            return `${toVisual(converted, system)} (${numericText})`;
   })()}
 </td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
