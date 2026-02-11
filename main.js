@@ -40,9 +40,9 @@ function updateTableHeader() {
         <th class="py-2 px-4 border-b border-gray-600">#</th>
         <th class="py-2 px-4 border-b border-gray-600">ALDR ID</th>
         ${isVisualMode ? '<th class="py-2 px-4 border-b border-gray-600">Thumbnail</th>' : ''}
-        <th class="py-2 px-4 border-b border-gray-600">Level Name</th>
+        <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[12rem]">Level Name</th>
         <th class="py-2 px-4 border-b border-gray-600">Creator</th>
-        <th class="py-2 px-4 border-b border-gray-600">Difficulty</th>
+        <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[11rem]">Difficulty</th>
         <th class="py-2 px-4 border-b border-gray-600">List Points</th>
     `;
 }
@@ -211,9 +211,9 @@ function renderTable() {
         row.innerHTML = `<td class='py-2 px-4'>${index++}</td>
                  <td class='py-2 px-4'>${l.id}</td>
                  ${thumbnailCell}
-                 <td class='py-2 px-4'>${l.name}</td>
+                 <td class='py-2 px-4 whitespace-nowrap min-w-[12rem]'>${l.name}</td>
                  <td class='py-2 px-4'>${l.creator}</td>
-                 <td>${(() => {
+                 <td class='py-2 px-4 whitespace-nowrap min-w-[11rem]'>${(() => {
       const system = document.getElementById('systemSelect').value;
       const converted = convert(l.punter, 'punter', system);
             const numericText = system === 'punter' ? formatPunterNumber(converted) : formatNumber(converted);
