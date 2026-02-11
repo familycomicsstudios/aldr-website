@@ -59,10 +59,10 @@ export function punterPrefix(value) {
   // Fractional part relative to integer floor (0.00 .. <1.00)
   const frac = value - Math.floor(value);
 
-  // Baseline at .00 (only for Effortless), Skyline at .99
+  // Baseline at .00, Skyline at .99
   const BASELINE_TOLERANCE = 0.01;
   const SKYLINE_TOLERANCE = 0.01;
-  if (value < 1 && frac <= BASELINE_TOLERANCE) return "Baseline ";
+  if (frac <= BASELINE_TOLERANCE) return "Baseline ";
   if (frac >= 0.99 - SKYLINE_TOLERANCE) return "Skyline ";
 
   // Subdifficulty bands shifted +0.5 compared to previous logic
