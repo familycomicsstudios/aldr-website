@@ -365,6 +365,7 @@ function closeAllModals() {
     playerModal.classList.add('hidden');
     rulesModal.classList.add('hidden');
     leaderboardModal.classList.add('hidden');
+    difficultyChartModal.classList.add('hidden');
 }
 
 
@@ -1072,6 +1073,12 @@ const completionModalClose = document.getElementById('completionModalClose');
 const openCompletionModal = document.getElementById('openCompletionModal');
 const completionForm = document.getElementById('completionForm');
 const completionStatus = document.getElementById('completionStatus');
+const difficultyChartButton = document.getElementById('difficultyChartButton');
+const difficultyChartModal = document.getElementById('difficultyChartModal');
+const difficultyChartModalClose = document.getElementById('difficultyChartModalClose');
+const difficultyChartAxis = document.getElementById('difficultyChartAxis');
+const difficultyChartArea = document.getElementById('difficultyChartArea');
+const difficultyChartLevels = document.getElementById('difficultyChartLevels');
 
 const DISCORD_WEBHOOK_URL = 
     ["https://", "discordapp.com", "api", "webhooks", "1444851149898518548", "WkkPgm3kkdE9QTTXCAAjdOpJzWZNAQGkfxWsZytQnvXfaXsBVZm2Z4Nh2G78IWBg_quo"]
@@ -1087,6 +1094,17 @@ openCompletionModal.addEventListener('click', () => {
 completionModalClose.addEventListener('click', () => completionModal.classList.add('hidden'));
 completionModal.addEventListener('click', e => {
     if (e.target === completionModal) completionModal.classList.add('hidden');
+});
+
+difficultyChartButton.addEventListener('click', () => {
+    closeAllModals();
+    difficultyChartModal.classList.remove('hidden');
+    buildDifficultyChart();
+});
+
+difficultyChartModalClose.addEventListener('click', () => difficultyChartModal.classList.add('hidden'));
+difficultyChartModal.addEventListener('click', e => {
+    if (e.target === difficultyChartModal) difficultyChartModal.classList.add('hidden');
 });
 
 completionForm.addEventListener('submit', async (e) => {
@@ -1158,4 +1176,126 @@ async function updateHeaderImage(topLevel) {
         console.warn("Header image missing for ID:", topLevel.id);
     }
 }
+
+const CHART_MIN = 0;
+const CHART_MAX = 16;
+const CHART_PADDING = 18;
+let difficultyChartEntries = [];
+let difficultyChartGroups = new Map();
+
+function buildDifficultyChart() {
+    if (!difficultyChartAxis || !difficultyChartArea || !difficultyChartLevels) return;
+
+    const chartHeight = difficultyChartArea.clientHeight;
+    const usableHeight = Math.max(1, chartHeight - CHART_PADDING * 2);
+    difficultyChartAxis.innerHTML = '';
+    difficultyChartLevels.innerHTML = '';
+    difficultyChartEntries = [];
+    difficultyChartGroups = new Map();
+
+    const axisLine = document.createElement('div');
+    axisLine.className = 'absolute left-1/2 top-0 bottom-0 w-px bg-gray-600';
+    difficultyChartAxis.appendChild(axisLine);
+
+    for (let i = CHART_MIN; i <= CHART_MAX; i += 1) {
+        const y = CHART_PADDING + (1 - (i - CHART_MIN) / (CHART_MAX - CHART_MIN)) * usableHeight;
+        const tick = document.createElement('div');
+        tick.className = 'absolute left-0 right-0 text-xs text-gray-300';
+        tick.style.top = `${y}px`;
+        tick.style.transform = 'translateY(-50%)';
+        tick.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="w-6 text-right">${i}</span>
+                <span class="h-px w-3 bg-gray-500"></span>
+            </div>
+        `;
+        difficultyChartAxis.appendChild(tick);
+    }
+
+    const showImpossible = showImpossibleEl.checked;
+    const showChallenge = showChallengeEl.checked;
+    const chartLevels = levels.filter(l => {
+        if (!showImpossible && l.impossible) return false;
+        if (!showChallenge && l.challenge) return false;
+        return true;
+    });
+
+    chartLevels.forEach(l => {
+        const key = formatPunterNumber(l.punter);
+        if (!difficultyChartGroups.has(key)) {
+            difficultyChartGroups.set(key, []);
+        }
+        difficultyChartGroups.get(key).push(l);
+    });
+
+    difficultyChartGroups.forEach((groupLevels, key) => {
+        const baseLevel = groupLevels[0];
+        const clamped = Math.max(CHART_MIN, Math.min(CHART_MAX, baseLevel.punter));
+        const y = CHART_PADDING + (1 - (clamped - CHART_MIN) / (CHART_MAX - CHART_MIN)) * usableHeight;
+        const theme = getPunterTheme(baseLevel.punter);
+        const baseZ = 10 + Math.round(baseLevel.punter * 10);
+        const box = document.createElement('div');
+        box.className = 'absolute left-0 min-w-[260px] max-w-[90%] px-3 py-1 rounded bg-gray-800 text-gray-100 text-xs shadow group cursor-pointer';
+        box.style.top = `${y}px`;
+        box.style.transform = 'translateY(-50%)';
+        box.style.zIndex = `${baseZ}`;
+        box.style.background = theme.bg;
+        box.style.color = theme.fg;
+        box.dataset.y = `${y}`;
+        box.dataset.baseZ = `${baseZ}`;
+        box.dataset.groupKey = key;
+        box.dataset.groupIndex = '0';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'opacity-0 group-hover:opacity-100';
+        labelSpan.textContent = formatDifficultyChartLabel(key, groupLevels, 0);
+        box.appendChild(labelSpan);
+        box.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentIndex = parseInt(box.dataset.groupIndex || '0', 10);
+            const nextIndex = (currentIndex + 1) % groupLevels.length;
+            box.dataset.groupIndex = `${nextIndex}`;
+            labelSpan.textContent = formatDifficultyChartLabel(key, groupLevels, nextIndex);
+        });
+        difficultyChartLevels.appendChild(box);
+        difficultyChartEntries.push(box);
+    });
+}
+
+function formatDifficultyChartLabel(key, groupLevels, index) {
+    const level = groupLevels[index];
+    const count = groupLevels.length;
+    const suffix = count > 1 ? ` (${index + 1}/${count})` : '';
+    return `${level.name} [${level.id}] (${key})${suffix}`;
+}
+
+function setChartFocusByY(y) {
+    if (!difficultyChartEntries.length) return;
+    let closest = null;
+    let minDist = Number.POSITIVE_INFINITY;
+    difficultyChartEntries.forEach(entry => {
+        const entryY = parseFloat(entry.dataset.y || '0');
+        const dist = Math.abs(y - entryY);
+        if (dist < minDist) {
+            minDist = dist;
+            closest = entry;
+        }
+    });
+
+    difficultyChartEntries.forEach(entry => {
+        const baseZ = entry.dataset.baseZ || '10';
+        entry.style.zIndex = entry === closest ? '1000' : baseZ;
+    });
+}
+
+difficultyChartArea.addEventListener('mousemove', e => {
+    const rect = difficultyChartArea.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    setChartFocusByY(y);
+});
+
+window.addEventListener('resize', () => {
+    if (!difficultyChartModal.classList.contains('hidden')) {
+        buildDifficultyChart();
+    }
+});
 

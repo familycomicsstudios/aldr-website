@@ -51,6 +51,9 @@
     <button id="openCompletionModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
       Submit a Completion
     </button>
+    <button id="difficultyChartButton" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
+      Difficulty Chart
+    </button>
   </div>
 
   <div class="mb-4 flex gap-4 items-center">
@@ -236,6 +239,20 @@
       </form>
 
       <p id="completionStatus" class="mt-4 text-sm text-gray-400"></p>
+    </div>
+  </div>
+
+  <div id="difficultyChartModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg w-11/12 max-w-5xl max-h-[85vh] overflow-y-auto relative">
+      <button id="difficultyChartModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
+      <h2 class="text-xl font-bold mb-4">Difficulty Chart</h2>
+      <p class="text-gray-300 text-sm mb-4">Levels are stacked to the right of the scale. The box closest to your cursor is brought to the front.</p>
+      <div class="flex gap-4">
+        <div id="difficultyChartAxis" class="relative w-20 h-[560px] md:h-[680px] shrink-0"></div>
+        <div id="difficultyChartArea" class="relative flex-1 h-[560px] md:h-[680px] bg-gray-900 border border-gray-700 rounded overflow-hidden">
+          <div id="difficultyChartLevels" class="absolute inset-0"></div>
+        </div>
+      </div>
     </div>
   </div>
 
