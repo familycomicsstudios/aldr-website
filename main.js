@@ -1031,6 +1031,8 @@ function showLeaderboard() {
                 });
             } else if (mode === 'levelsBeaten') {
                 totalPoints = playerLevels.length; // +1 per level beaten
+            } else if (mode === 'listPoints') {
+                totalPoints = playerLevels.reduce((acc, l) => acc + l.points, 0);
             } else if (mode === 'skill') {
                 totalPoints = calculateSkill(playerLevels);
             } else {
