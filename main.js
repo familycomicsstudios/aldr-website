@@ -100,6 +100,31 @@ function displayNumber(num) {
     return (typeof num === 'number') ? num.toFixed(2) : num;
 }
 
+function getPunterTheme(value) {
+    if (value === 0) return { bg: '#000000', fg: '#ffffff' };
+    if (value >= 16) return { bg: '#000000', fg: '#ffffff' };
+    const tier = Math.max(0, Math.floor(value));
+    const themes = {
+        0: { bg: '#23af00', fg: '#ffffff' },
+        1: { bg: '#33ff00', fg: '#000000' },
+        2: { bg: '#fbff00', fg: '#000000' },
+        3: { bg: '#ff6f00', fg: '#000000' },
+        4: { bg: '#ff0000', fg: '#000000' },
+        5: { bg: '#960000', fg: '#ffffff' },
+        6: { bg: '#000000', fg: '#ffffff' },
+        7: { bg: '#3300ff', fg: '#ffffff' },
+        8: { bg: '#0066ff', fg: '#ffffff' },
+        9: { bg: '#00ffff', fg: '#000000' },
+        10: { bg: '#ffffff', fg: '#000000' },
+        11: { bg: '#ff00c8', fg: '#000000' },
+        12: { bg: '#ff63dd', fg: '#000000' },
+        13: { bg: '#0017ff', fg: '#ffffff' },
+        14: { bg: '#000ea6', fg: '#ffffff' },
+        15: { bg: '#000750', fg: '#ffffff' }
+    };
+    return themes[tier] || { bg: '#000000', fg: '#ffffff' };
+}
+
 
 function updateBiasLabel() {
     const bias = document.getElementById('biasSlider').value;
@@ -191,15 +216,20 @@ function renderTable() {
                  <td>${(() => {
       const system = document.getElementById('systemSelect').value;
       const converted = convert(l.punter, 'punter', system);
-      if (system === 'grassy') {
-        const difficultyText = toVisual(converted, system);
-        if (isVisualMode) {
-          return `<img src="assets/grassy-scale/${difficultyText}.svg" alt="${difficultyText}" class="h-24 inline-block" onerror="this.outerHTML='${difficultyText}'" />`;
-        }
-        return difficultyText;
-      }
             const numericText = system === 'punter' ? formatPunterNumber(converted) : formatNumber(converted);
-            return `${toVisual(converted, system)} (${numericText})`;
+            if (system === 'grassy') {
+                const difficultyText = toVisual(converted, system);
+                if (isVisualMode) {
+                    return `<img src="assets/grassy-scale/${difficultyText}.svg" alt="${difficultyText}" class="h-24 inline-block" onerror="this.outerHTML='${difficultyText}'" />`;
+                }
+                return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${difficultyText}</span>`;
+            }
+            if (system === 'punter') {
+                const visualText = toVisual(converted, system);
+                const theme = getPunterTheme(converted);
+                return `<span class="inline-block px-2 py-1 rounded-full" style="background:${theme.bg}; color:${theme.fg};">${visualText} (${numericText})</span>`;
+            }
+            return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${toVisual(converted, system)} (${numericText})</span>`;
   })()}
 </td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
@@ -678,11 +708,24 @@ function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoi
     const hardestLabel = 'Hardest:';
     const labelWidth = ctx.measureText(hardestLabel).width;
     ctx.fillText(hardestLabel, 180, 120);
-    ctx.font = '16px "Trebuchet MS", "Segoe UI", Arial';
-    const valueX = 180 + labelWidth + 8;
+    const valueX = 180 + labelWidth + 10;
     if (hardestLevel) {
-        ctx.fillText(`${hardestLevel.name} (${hardestLevel.punter.toFixed(2)})`, valueX, 120);
+        const numericText = formatPunterNumber(hardestLevel.punter);
+        const pillText = `${hardestLevel.name} (${numericText})`;
+        const theme = getPunterTheme(hardestLevel.punter);
+        ctx.font = 'bold 14px "Trebuchet MS", "Segoe UI", Arial';
+        const pillPaddingX = 10;
+        const pillPaddingY = 6;
+        const textWidth = ctx.measureText(pillText).width;
+        const pillWidth = textWidth + pillPaddingX * 2;
+        const pillHeight = 22;
+        const pillY = 120 - pillHeight + 6;
+        ctx.fillStyle = theme.bg;
+        drawRoundedRect(ctx, valueX, pillY, pillWidth, pillHeight, 11, true, false);
+        ctx.fillStyle = theme.fg;
+        ctx.fillText(pillText, valueX + pillPaddingX, 120);
     } else {
+        ctx.font = '16px "Trebuchet MS", "Segoe UI", Arial';
         ctx.fillText('N/A', valueX, 120);
     }
     
