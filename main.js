@@ -2,9 +2,12 @@ import { convert, toVisual, formatNumber, formatPunterNumber } from './converter
 
 const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmzFAjjdUVKWhDSLue_SvTQIxT4ZbhlvBa6yc4l4juAZn3HREfvO0VIv2ms98453VItI/pub?gid=0&single=true&output=csv';
 let levels = [];
+let modUrlMap = new Map();
+let lastRenderedLevels = [];
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
+const modSelect = document.getElementById('modSelect');
 const visualModeCheckbox = document.getElementById('visualMode');
 
 function getYoutubeThumbnail(videoUrl) {
@@ -50,6 +53,9 @@ function updateTableHeader() {
 // Re-render table on input
 searchInput.addEventListener('input', renderTable);
 sortSelect.addEventListener('change', renderTable);
+if (modSelect) {
+    modSelect.addEventListener('change', renderTable);
+}
 
 document.getElementById('systemSelect')
     .addEventListener('change', () => renderTable());
@@ -71,10 +77,18 @@ fetch(sheetUrl)
             if (!r['ALDR ID']?.trim()) return;
 
             const victorsRaw = r['Victors'] || '';
+            const modName = (r['Mod Name'] || '').trim();
+            const modUrl = normalizeModUrl(r['Mod URL']);
+            if (modName && modUrl && !modUrlMap.has(modUrl)) {
+                modUrlMap.set(modUrl, modName);
+            }
+
             levels.push({
                 id: r['ALDR ID'],
                 name: r['Level Name'],
                 creator: r['Level Creator'],
+                modProject: r['Project'] || '',
+                modUrl: normalizeModUrl(r['Project']),
                 punter: parseFloat(r['Punter Scale Difficulty']) || 0,
                 skillBalance: parseFloat(r['Skills Balance']) || 0,
                 project: r['Project'] || '',
@@ -87,6 +101,7 @@ fetch(sheetUrl)
                 challenge: r['Challenge?'] === '1'
             });
         });
+        populateModSelect();
         renderTable();
     });
 
@@ -148,11 +163,18 @@ function renderTable() {
     const showChallenge = showChallengeEl.checked;
     const searchTerm = searchInput.value.toLowerCase();
     const sortBy = sortSelect.value;
+    const selectedMod = modSelect ? modSelect.value : 'all';
 
     // Filter levels by checkbox and search
     const filtered = levels.filter(l => {
         if (!showImpossible && l.impossible) return false;
         if (!showChallenge && l.challenge) return false;
+        if (selectedMod === 'none') {
+            if (l.modUrl) return false;
+        } else if (selectedMod !== 'all') {
+            const normalizedSelected = normalizeModUrl(selectedMod);
+            if (!l.modUrl || l.modUrl.toLowerCase() !== normalizedSelected.toLowerCase()) return false;
+        }
         if (searchTerm) {
             const haystack = `${l.name} ${l.creator} ${l.id}`.toLowerCase();
             if (!haystack.includes(searchTerm)) return false;
@@ -178,6 +200,7 @@ function renderTable() {
         sorted = filtered;
     }
 
+    lastRenderedLevels = sorted;
     updateHeaderImage(sorted[0]);
 
     const isVisualMode = visualModeCheckbox.checked;
@@ -244,6 +267,33 @@ function renderTable() {
             }, 0);
         }
     });
+}
+
+function populateModSelect() {
+    if (!modSelect) return;
+
+    const existingOptions = Array.from(modSelect.querySelectorAll('option'))
+        .map(option => option.value);
+
+    const modUrls = Array.from(new Set(
+        levels
+            .map(level => normalizeModUrl(level.modUrl))
+            .filter(url => url.length > 0)
+    )).sort((a, b) => a.localeCompare(b));
+
+    modUrls.forEach(url => {
+        if (existingOptions.includes(url)) return;
+        const option = document.createElement('option');
+        option.value = url;
+        option.textContent = modUrlMap.get(url) || url;
+        option.dataset.url = url;
+        option.title = url;
+        modSelect.appendChild(option);
+    });
+}
+
+function normalizeModUrl(value) {
+    return (value || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
 function loadThumbnailAsync(row, videoUrl) {
@@ -1076,6 +1126,7 @@ const completionStatus = document.getElementById('completionStatus');
 const difficultyChartButton = document.getElementById('difficultyChartButton');
 const difficultyChartModal = document.getElementById('difficultyChartModal');
 const difficultyChartModalClose = document.getElementById('difficultyChartModalClose');
+const difficultyChartShowLabels = document.getElementById('difficultyChartShowLabels');
 const difficultyChartAxis = document.getElementById('difficultyChartAxis');
 const difficultyChartArea = document.getElementById('difficultyChartArea');
 const difficultyChartLevels = document.getElementById('difficultyChartLevels');
@@ -1106,6 +1157,9 @@ difficultyChartModalClose.addEventListener('click', () => difficultyChartModal.c
 difficultyChartModal.addEventListener('click', e => {
     if (e.target === difficultyChartModal) difficultyChartModal.classList.add('hidden');
 });
+if (difficultyChartShowLabels) {
+    difficultyChartShowLabels.addEventListener('change', updateDifficultyChartLabelVisibility);
+}
 
 completionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1212,13 +1266,7 @@ function buildDifficultyChart() {
         difficultyChartAxis.appendChild(tick);
     }
 
-    const showImpossible = showImpossibleEl.checked;
-    const showChallenge = showChallengeEl.checked;
-    const chartLevels = levels.filter(l => {
-        if (!showImpossible && l.impossible) return false;
-        if (!showChallenge && l.challenge) return false;
-        return true;
-    });
+    const chartLevels = lastRenderedLevels.length ? lastRenderedLevels : levels;
 
     chartLevels.forEach(l => {
         const key = formatPunterNumber(l.punter);
@@ -1235,7 +1283,7 @@ function buildDifficultyChart() {
         const theme = getPunterTheme(baseLevel.punter);
         const baseZ = 10 + Math.round(baseLevel.punter * 10);
         const box = document.createElement('div');
-        box.className = 'absolute left-0 min-w-[260px] max-w-[90%] px-3 py-1 rounded bg-gray-800 text-gray-100 text-xs shadow group cursor-pointer';
+        box.className = 'chart-box absolute left-0 min-w-[260px] max-w-[90%] px-3 py-1 rounded bg-gray-800 text-gray-100 text-xs shadow cursor-pointer';
         box.style.top = `${y}px`;
         box.style.transform = 'translateY(-50%)';
         box.style.zIndex = `${baseZ}`;
@@ -1246,9 +1294,12 @@ function buildDifficultyChart() {
         box.dataset.groupKey = key;
         box.dataset.groupIndex = '0';
         const labelSpan = document.createElement('span');
-        labelSpan.className = 'opacity-0 group-hover:opacity-100';
+        labelSpan.className = 'chart-label';
         labelSpan.textContent = formatDifficultyChartLabel(key, groupLevels, 0);
         box.appendChild(labelSpan);
+        if (difficultyChartShowLabels && difficultyChartShowLabels.checked) {
+            box.classList.add('show-labels');
+        }
         box.addEventListener('click', (e) => {
             e.stopPropagation();
             const currentIndex = parseInt(box.dataset.groupIndex || '0', 10);
@@ -1258,6 +1309,14 @@ function buildDifficultyChart() {
         });
         difficultyChartLevels.appendChild(box);
         difficultyChartEntries.push(box);
+    });
+}
+
+function updateDifficultyChartLabelVisibility() {
+    if (!difficultyChartShowLabels) return;
+    const shouldShow = difficultyChartShowLabels.checked;
+    difficultyChartEntries.forEach(entry => {
+        entry.classList.toggle('show-labels', shouldShow);
     });
 }
 
