@@ -20,6 +20,54 @@ function getYoutubeThumbnail(videoUrl) {
     return match ? `https://img.youtube.com/vi/${match[1]}/maxresdefault.jpg` : null;
 }
 
+function getYoutubeThumbnailCandidates(videoUrl) {
+    if (!videoUrl || !videoUrl.trim()) return [];
+
+    if (isImageUrl(videoUrl)) return [videoUrl];
+
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) return [];
+
+    const formats = ['maxresdefault', 'hqdefault', 'sddefault', 'mqdefault', 'default'];
+    return formats.map(format => `https://img.youtube.com/vi/${videoId}/${format}.jpg`);
+}
+
+function resolveYoutubeThumbnailUrl(videoUrl) {
+    const candidates = getYoutubeThumbnailCandidates(videoUrl);
+    if (!candidates.length) return Promise.resolve(null);
+
+    return new Promise(resolve => {
+        let index = 0;
+        const img = new Image();
+
+        const tryNext = () => {
+            if (index >= candidates.length) {
+                resolve(null);
+                return;
+            }
+
+            const url = candidates[index];
+            img.onload = () => {
+                const isDefault = url.includes('/default.jpg');
+                const isPlaceholder = img.naturalWidth <= 120 && img.naturalHeight <= 90;
+                if (!isDefault && isPlaceholder) {
+                    index += 1;
+                    tryNext();
+                    return;
+                }
+                resolve(url);
+            };
+            img.onerror = () => {
+                index += 1;
+                tryNext();
+            };
+            img.src = url;
+        };
+
+        tryNext();
+    });
+}
+
 function extractVideoId(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
     
@@ -207,7 +255,7 @@ function renderTable() {
     let index = 1;
     sorted.forEach(l => {
         const row = document.createElement('tr');
-        row.className = 'border-b border-gray-700 hover:bg-gray-700 cursor-pointer';
+        row.className = 'glass-row cursor-pointer';
         
         let thumbnailCell = '';
         if (isVisualMode) {
@@ -334,31 +382,23 @@ function loadThumbnailAsync(row, videoUrl) {
         return;
     }
     
-    // Try multiple thumbnail formats in order of quality
-    // Skip sddefault as it often shows placeholder images
-    const thumbnailFormats = [
-        'maxresdefault',
-        'hqdefault',
-        'mqdefault'
-    ];
-    
+    const thumbnailCandidates = getYoutubeThumbnailCandidates(videoUrl);
     let currentFormatIndex = 0;
-    
+
     function tryNextFormat() {
-        if (currentFormatIndex >= thumbnailFormats.length) {
+        if (currentFormatIndex >= thumbnailCandidates.length) {
             container.innerHTML = '<img src="assets/defaultThumbnail.png" alt="Default thumbnail" class="w-full h-full object-cover">';
             return;
         }
-        
-        const format = thumbnailFormats[currentFormatIndex];
-        const imgUrl = `https://img.youtube.com/vi/${videoId}/${format}.jpg`;
+
+        const imgUrl = thumbnailCandidates[currentFormatIndex];
         
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
         // Set a timeout to prevent hanging
         const timeout = setTimeout(() => {
-            if (currentFormatIndex < thumbnailFormats.length - 1) {
+            if (currentFormatIndex < thumbnailCandidates.length - 1) {
                 currentFormatIndex++;
                 tryNextFormat();
             } else {
@@ -370,7 +410,8 @@ function loadThumbnailAsync(row, videoUrl) {
             clearTimeout(timeout);
             // Verify the image actually loaded and isn't a placeholder
             // Check if image dimensions are reasonable (not 120x90 which is placeholder size)
-            if (img.naturalWidth > 120 || img.naturalHeight > 90) {
+            const isDefault = imgUrl.includes('/default.jpg');
+            if (isDefault || img.naturalWidth > 120 || img.naturalHeight > 90) {
                 container.innerHTML = `<img src="${imgUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
             } else {
                 // Likely a placeholder, try next format
@@ -1210,25 +1251,21 @@ completionForm.addEventListener('submit', async (e) => {
 async function updateHeaderImage(topLevel) {
     if (!topLevel || !topLevel.id) return;
 
-    const imgUrl = `backgrounds/${topLevel.id}.png`;
-
     console.log("Header image updated")
 
-    // Check if the file exists
-    try {
-        const res = await fetch(imgUrl, { method: "HEAD" });
-        if (!res.ok) return; // image missing → do nothing
+    const resolvedThumbnailUrl = await resolveYoutubeThumbnailUrl(topLevel.video);
+    const thumbnailUrl = resolvedThumbnailUrl || 'assets/defaultThumbnail.png';
 
-        // Apply the image
-        const header = document.getElementById('dynamicHeader');
-        header.style.backgroundImage = `url('${imgUrl}')`;
-
-        // Remove fallback text overlay if present
-        if (header.firstElementChild) header.firstElementChild.style.display = "none";
-
-    } catch (e) {
-        console.warn("Header image missing for ID:", topLevel.id);
-    }
+    const backgroundImage = new Image();
+    backgroundImage.onload = () => {
+        const body = document.body;
+        body.style.backgroundImage = `url('${thumbnailUrl}')`;
+        body.style.backgroundSize = 'cover';
+        body.style.backgroundPosition = 'center';
+        body.style.backgroundRepeat = 'no-repeat';
+        body.style.backgroundAttachment = 'fixed';
+    };
+    backgroundImage.src = thumbnailUrl;
 }
 
 const CHART_MIN = 0;
