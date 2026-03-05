@@ -9,6 +9,7 @@ const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
 const modSelect = document.getElementById('modSelect');
 const visualModeCheckbox = document.getElementById('visualMode');
+const lowDefinitionModeCheckbox = document.getElementById('lowDefinitionMode');
 
 function getYoutubeThumbnail(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
@@ -112,6 +113,15 @@ visualModeCheckbox.addEventListener('change', () => {
     updateTableHeader();
     renderTable();
 });
+
+function updateLowDefinitionMode() {
+    document.body.classList.toggle('low-definition-mode', !!lowDefinitionModeCheckbox?.checked);
+}
+
+if (lowDefinitionModeCheckbox) {
+    lowDefinitionModeCheckbox.addEventListener('change', updateLowDefinitionMode);
+    updateLowDefinitionMode();
+}
 
 // Initialize table header
 updateTableHeader();

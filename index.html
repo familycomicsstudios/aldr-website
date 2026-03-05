@@ -80,6 +80,14 @@
       border-top-right-radius: 16px;
       border-bottom-right-radius: 16px;
     }
+
+    body.low-definition-mode .glass-panel,
+    body.low-definition-mode .glass-header th,
+    body.low-definition-mode .glass-row td {
+      background: rgba(17, 24, 39, 0.96);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
   </style>
 </head>
 <body class="bg-gray-900 text-gray-200 p-6 md:p-8">
@@ -108,6 +116,10 @@
     <label class="flex items-center gap-2 text-gray-300">
       <input type="checkbox" id="visualMode" class="form-checkbox" checked>
       Show Thumbnails
+    </label>
+    <label class="flex items-center gap-2 text-gray-300">
+      <input type="checkbox" id="lowDefinitionMode" class="form-checkbox">
+      Low Definition Mode
     </label></p><br>
 
     <div class="mb-4">
