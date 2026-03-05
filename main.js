@@ -95,6 +95,7 @@ function updateTableHeader() {
         <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[12rem]">Level Name</th>
         <th class="py-2 px-4 border-b border-gray-600">Creator</th>
         <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[11rem]">Difficulty</th>
+        <th class="py-2 px-4 border-b border-gray-600">Quality</th>
         <th class="py-2 px-4 border-b border-gray-600">List Points</th>
     `;
 }
@@ -154,6 +155,7 @@ fetch(sheetUrl)
                 video: r['Video'] || '',
                 notes: r['Notes'] || '',
                 levelCode: r['Level Code'] || '',
+                quality: parseQualityValue(r['Quality']),
                 victors: victorsRaw ? victorsRaw.split(',').map(v => v.trim()) : [],
                 impossible: r['Impossible?'] === '1',
                 challenge: r['Challenge?'] === '1'
@@ -171,6 +173,64 @@ updateBiasLabel();
 
 function displayNumber(num) {
     return (typeof num === 'number') ? num.toFixed(2) : num;
+}
+
+function parseQualityValue(raw) {
+    if (raw === undefined || raw === null) return null;
+    const text = String(raw).trim();
+    if (!text) return null;
+    const n = Number(text);
+    if (Number.isNaN(n)) return null;
+    return Math.max(0, Math.min(5, Math.round(n)));
+}
+
+function getQualityBadgeHtml(qualityValue) {
+    if (qualityValue === null || qualityValue === undefined) {
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:#000000; color:#ffffff;">N/A</span>`;
+    }
+    const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
+    const value = Math.max(0, Math.min(5, qualityValue));
+    const hue = Math.round((value / 5) * 120);
+    const color = `hsl(${hue}, 80%, 40%)`;
+    const textColor = value >= 3 ? '#000000' : '#ffffff';
+    return `<span class="inline-block px-2 py-1 rounded-full" style="background:${color}; color:${textColor};">${labels[value]} (${value})</span>`;
+}
+
+function getDifficultyDisplayHtml(punterValue, system, isVisualMode) {
+    const converted = convert(punterValue, 'punter', system);
+    const numericText = system === 'punter' ? formatPunterNumber(converted) : formatNumber(converted);
+
+    if (system === 'grassy') {
+        const difficultyText = toVisual(converted, system);
+        if (isVisualMode) {
+            return `<img src="assets/grassy-scale/${difficultyText}.svg" alt="${difficultyText}" class="h-24 inline-block" onerror="this.outerHTML='${difficultyText}'" />`;
+        }
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${difficultyText}</span>`;
+    }
+
+    if (system === 'punter') {
+        const visualText = toVisual(converted, system);
+        const theme = getPunterTheme(converted);
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:${theme.bg}; color:${theme.fg};">${visualText} (${numericText})</span>`;
+    }
+
+    return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${toVisual(converted, system)} (${numericText})</span>`;
+}
+
+function getPlacementForModal(level) {
+    const bias = document.getElementById('biasSlider').value;
+    const showImpossible = showImpossibleEl.checked;
+    const showChallenge = showChallengeEl.checked;
+
+    const baseLevels = levels.filter(l => {
+        if (!showImpossible && l.impossible) return false;
+        if (!showChallenge && l.challenge) return false;
+        return true;
+    });
+
+    const ranked = [...baseLevels].sort((a, b) => score(b, bias) - score(a, bias));
+    const idx = ranked.findIndex(l => String(l.id) === String(level.id));
+    return idx >= 0 ? idx + 1 : null;
 }
 
 function getPunterTheme(value) {
@@ -294,25 +354,8 @@ function renderTable() {
                  ${thumbnailCell}
                  <td class='py-2 px-4 whitespace-nowrap min-w-[12rem]'>${l.name}</td>
                  <td class='py-2 px-4'>${l.creator}</td>
-                 <td class='py-2 px-4 whitespace-nowrap min-w-[11rem]'>${(() => {
-      const system = document.getElementById('systemSelect').value;
-      const converted = convert(l.punter, 'punter', system);
-            const numericText = system === 'punter' ? formatPunterNumber(converted) : formatNumber(converted);
-            if (system === 'grassy') {
-                const difficultyText = toVisual(converted, system);
-                if (isVisualMode) {
-                    return `<img src="assets/grassy-scale/${difficultyText}.svg" alt="${difficultyText}" class="h-24 inline-block" onerror="this.outerHTML='${difficultyText}'" />`;
-                }
-                return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${difficultyText}</span>`;
-            }
-            if (system === 'punter') {
-                const visualText = toVisual(converted, system);
-                const theme = getPunterTheme(converted);
-                return `<span class="inline-block px-2 py-1 rounded-full" style="background:${theme.bg}; color:${theme.fg};">${visualText} (${numericText})</span>`;
-            }
-            return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${toVisual(converted, system)} (${numericText})</span>`;
-  })()}
-</td>
+                 <td class='py-2 px-4 whitespace-nowrap min-w-[11rem]'>${getDifficultyDisplayHtml(l.punter, document.getElementById('systemSelect').value, isVisualMode)}</td>
+                 <td class='py-2 px-4'>${getQualityBadgeHtml(l.quality)}</td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
         tbody.appendChild(row);
@@ -473,6 +516,16 @@ function closeAllModals() {
 function showModal(level) {
     closeAllModals();
     document.getElementById('modalName').innerText = level.name;
+
+    const currentSystem = document.getElementById('systemSelect').value;
+    const placement = getPlacementForModal(level);
+    document.getElementById('modalPlacement').innerText = placement ? `#${placement}` : 'N/A';
+    document.getElementById('modalId').innerText = level.id || 'N/A';
+    document.getElementById('modalCreator').innerText = level.creator || 'N/A';
+    document.getElementById('modalDifficultyCurrent').innerHTML = getDifficultyDisplayHtml(level.punter, currentSystem, false);
+    document.getElementById('modalDifficultyPunter').innerHTML = getDifficultyDisplayHtml(level.punter, 'punter', false);
+    document.getElementById('modalQuality').innerHTML = getQualityBadgeHtml(level.quality);
+    document.getElementById('modalPoints').innerText = displayNumber(level.points);
 
     // Skills Balance
     const skillBalanceContainer = document.getElementById('modalSkillBalanceContainer');
