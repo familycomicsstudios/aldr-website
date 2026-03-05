@@ -39,10 +39,10 @@ const grassyVisuals = [
   [0, "Low Beginner"], [1.5, "Medium Beginner"], [2, "High Beginner"],
   [2.5, "Low Intermediate"], [3, "Medium Intermediate"], [3.25, "High Intermediate"],
   [3.5, "Low Advanced"], [3.75, "Medium Advanced"], [4, "High Advanced"],
-  [4.5, "Low Expert"], [5.25, "Medium Expert"], [6, "High Expert"],
-  [6.75, "Low Master"], [7, "Medium Master"], [7.25, "High Master"],
-  [7.5, "Low Grandmaster I"], [7.75, "Medium Grandmaster I"], [8, "High Grandmaster I"],
-  [8.75, "Grandmaster II"], [9.5, "Grandmaster III"]
+  [4.5, "Low Expert"], [5.25, "Medium Expert"], [5.75, "High Expert"],
+  [6.11, "Low Master"], [6.4, "Medium Master"], [6.98, "High Master"],
+  [7.4, "Low Grandmaster I"], [8.05, "Medium Grandmaster I"], [8.25, "High Grandmaster I"],
+  [8.9, "Grandmaster II"], [9.75, "Grandmaster III"]
   // For higher Grandmaster tiers we add logic dynamically
 ];
 
@@ -122,7 +122,7 @@ export function toVisual(value, system) {
         return `Grandmaster ${tier >= 4 ? toRoman(tier) : tier}`;
       }
       for (let i = grassyVisuals.length-1; i >= 0; i--) {
-        if (value > grassyVisuals[i][0]) return grassyVisuals[i][1];
+        if (value >= grassyVisuals[i][0]) return grassyVisuals[i][1];
       }
       return formatNumber(value);
     default:
@@ -203,9 +203,9 @@ export function visualToNumber(text, system) {
           const prefix = text.match(/^(Low|Medium|High)/i);
           if (prefix) {
             const prefixText = prefix[1].toLowerCase();
-            if (prefixText === 'low') return 7.5;
-            if (prefixText === 'medium') return 7.75;
-            if (prefixText === 'high') return 8;
+            if (prefixText === 'low') return 7.4;
+            if (prefixText === 'medium') return 8.05;
+            if (prefixText === 'high') return 8.25;
           }
         }
         return 8.5 + (tier - 2) * 1;
