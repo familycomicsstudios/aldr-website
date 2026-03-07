@@ -7,7 +7,7 @@ export function linearInterpolation(x0, y0, x1, y1, x) {
 // Conversion tables
 const michaelChanTable = [
   [0.1, 0.1], [1, 1], [2, 1.5], [3, 2], [4, 3], [8, 4],
-  [10, 5], [20, 7], [30, 8], [40, 9], [50, 10],
+  [10, 5], [20, 6.1], [30, 7.5], [40, 8.95], [50, 10],
   [60, 11], [80, 12], [100, 13], [200, 15]
 ];
 
@@ -106,10 +106,10 @@ export function toVisual(value, system) {
       }
       return `${formatPunterNumber(value)}`; // no prefix if too low
     case 'michaelchan':
-      if (value < 1) return `${formatNumber(value*10)}⚡`;
-      if (value < 10) return `${formatNumber(value)}💥`;
-      if (value < 100) return `${formatNumber(value/10)}💣`;
-      return `${formatNumber(value/100)}🧨`;
+      if (value < 1) return `${Math.floor(value * 10)}⚡`;
+      if (value < 10) return `${Math.floor(value)}💥`;
+      if (value < 100) return `${Math.floor(value / 10)}💣`;
+      return `${Math.floor(value / 100)}🧨`;
     case 'scheep':
       for (let i = scheepVisuals.length-1; i >= 0; i--) {
         if (value >= scheepVisuals[i][0]) return scheepVisuals[i][1];

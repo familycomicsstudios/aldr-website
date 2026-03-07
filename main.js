@@ -214,6 +214,10 @@ function getDifficultyDisplayHtml(punterValue, system, isVisualMode) {
         return `<span class="inline-block px-2 py-1 rounded-full" style="background:${theme.bg}; color:${theme.fg};">${visualText} (${numericText})</span>`;
     }
 
+    if (system === 'michaelchan') {
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${toVisual(converted, system)}</span>`;
+    }
+
     return `<span class="inline-block px-2 py-1 rounded-full" style="background:#ffffff; color:#000000;">${toVisual(converted, system)} (${numericText})</span>`;
 }
 
@@ -314,6 +318,13 @@ function renderTable() {
         const idB = parseInt(b.id, 10);
         return idA - idB;
     });
+    } else if (sortBy === 'quality') {
+        sorted = [...filtered].sort((a, b) => {
+            const qualityA = a.quality ?? -1;
+            const qualityB = b.quality ?? -1;
+            if (qualityB !== qualityA) return qualityB - qualityA;
+            return score(b, bias) - score(a, bias);
+        });
     } else {
         sorted = filtered;
     }
