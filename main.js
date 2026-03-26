@@ -4,12 +4,46 @@ const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmz
 let levels = [];
 let modUrlMap = new Map();
 let lastRenderedLevels = [];
+const initialRanges = ['A:I', 'K:P'];
+const levelCodeCache = new Map();
+const levelCodeRequestCache = new Map();
+let activeModalLevelId = null;
+const THUMBNAIL_EAGER_COUNT = 20;
+let thumbnailObserver = null;
+let pendingRenderFrame = null;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(error => {
+            console.warn('Service worker registration failed:', error);
+        });
+    });
+}
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
 const modSelect = document.getElementById('modSelect');
 const visualModeCheckbox = document.getElementById('visualMode');
 const lowDefinitionModeCheckbox = document.getElementById('lowDefinitionMode');
+
+function debounce(callback, delayMs) {
+    let timeoutId = null;
+    return (...args) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => callback(...args), delayMs);
+    };
+}
+
+function scheduleRenderTable() {
+    if (pendingRenderFrame !== null) return;
+    pendingRenderFrame = requestAnimationFrame(() => {
+        pendingRenderFrame = null;
+        renderTable();
+    });
+}
+
+const debouncedSearchRender = debounce(scheduleRenderTable, 120);
+const debouncedBiasRender = debounce(scheduleRenderTable, 80);
 
 function getYoutubeThumbnail(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
@@ -101,18 +135,18 @@ function updateTableHeader() {
 }
 
 // Re-render table on input
-searchInput.addEventListener('input', renderTable);
-sortSelect.addEventListener('change', renderTable);
+searchInput.addEventListener('input', debouncedSearchRender);
+sortSelect.addEventListener('change', scheduleRenderTable);
 if (modSelect) {
-    modSelect.addEventListener('change', renderTable);
+    modSelect.addEventListener('change', scheduleRenderTable);
 }
 
 document.getElementById('systemSelect')
-    .addEventListener('change', () => renderTable());
+    .addEventListener('change', scheduleRenderTable);
 
 visualModeCheckbox.addEventListener('change', () => {
     updateTableHeader();
-    renderTable();
+    scheduleRenderTable();
 });
 
 function updateLowDefinitionMode() {
@@ -127,47 +161,164 @@ if (lowDefinitionModeCheckbox) {
 // Initialize table header
 updateTableHeader();
 
-// Fetch CSV and parse with PapaParse
-fetch(sheetUrl)
-    .then(res => res.text())
-    .then(text => {
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-        parsed.data.forEach(r => {
-            if (!r['ALDR ID']?.trim()) return;
+loadLevels();
 
-            const victorsRaw = r['Victors'] || '';
-            const modName = (r['Mod Name'] || '').trim();
-            const modUrl = normalizeModUrl(r['Mod URL']);
-            if (modName && modUrl && !modUrlMap.has(modUrl)) {
-                modUrlMap.set(modUrl, modName);
-            }
+async function loadLevels() {
+    try {
+        const [leftRangeRows, rightRangeRows] = await Promise.all(
+            initialRanges.map(fetchRowsForRange)
+        );
+        parseAndStoreLevels(leftRangeRows, rightRangeRows);
+    } catch (error) {
+        console.warn('Range-based fetch failed, falling back to full sheet fetch.', error);
+        const fullRows = await fetchRowsFromUrl(sheetUrl);
+        parseAndStoreLevels(fullRows, []);
+    }
 
-            levels.push({
-                id: r['ALDR ID'],
-                name: r['Level Name'],
-                creator: r['Level Creator'],
-                modProject: r['Project'] || '',
-                modUrl: normalizeModUrl(r['Project']),
-                punter: parseFloat(r['Punter Scale Difficulty']) || 0,
-                skillBalance: parseFloat(r['Skills Balance']) || 0,
-                project: r['Project'] || '',
-                points: parseFloat(r['List Points']) || 0,
-                video: r['Video'] || '',
-                notes: r['Notes'] || '',
-                levelCode: r['Level Code'] || '',
-                quality: parseQualityValue(r['Quality']),
-                victors: victorsRaw ? victorsRaw.split(',').map(v => v.trim()) : [],
-                impossible: r['Impossible?'] === '1',
-                challenge: r['Challenge?'] === '1'
-            });
+    populateModSelect();
+    renderTable();
+}
+
+async function fetchRowsForRange(range) {
+    const rangeUrl = `${sheetUrl}&range=${encodeURIComponent(range)}`;
+    return fetchRowsFromUrl(rangeUrl);
+}
+
+async function fetchRowsFromUrl(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch sheet data (${response.status})`);
+    }
+    const text = await response.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: false });
+    return parsed.data || [];
+}
+
+function parseAndStoreLevels(primaryRows, secondaryRows) {
+    levels = [];
+    modUrlMap = new Map();
+
+    const rowCount = Math.max(primaryRows.length, secondaryRows.length);
+    for (let index = 0; index < rowCount; index += 1) {
+        const mergedRow = {
+            ...(primaryRows[index] || {}),
+            ...(secondaryRows[index] || {})
+        };
+
+        if (!mergedRow['ALDR ID']?.trim()) continue;
+
+        const victorsRaw = mergedRow['Victors'] || '';
+        const modName = (mergedRow['Mod Name'] || '').trim();
+        const modUrl = normalizeModUrl(mergedRow['Mod URL']);
+        if (modName && modUrl && !modUrlMap.has(modUrl)) {
+            modUrlMap.set(modUrl, modName);
+        }
+
+        levels.push({
+            id: mergedRow['ALDR ID'],
+            rowNumber: index + 2,
+            name: mergedRow['Level Name'],
+            creator: mergedRow['Level Creator'],
+            modProject: mergedRow['Project'] || '',
+            modUrl,
+            punter: parseFloat(mergedRow['Punter Scale Difficulty']) || 0,
+            skillBalance: parseFloat(mergedRow['Skills Balance']) || 0,
+            project: mergedRow['Project'] || '',
+            points: parseFloat(mergedRow['List Points']) || 0,
+            video: mergedRow['Video'] || '',
+            notes: mergedRow['Notes'] || '',
+            quality: parseQualityValue(mergedRow['Quality']),
+            victors: victorsRaw ? victorsRaw.split(',').map(v => v.trim()) : [],
+            impossible: mergedRow['Impossible?'] === '1',
+            challenge: mergedRow['Challenge?'] === '1'
         });
-        populateModSelect();
-        renderTable();
-    });
+    }
+}
+
+function extractSingleCellValue(csvText, headerName) {
+    const parsed = Papa.parse(csvText, { header: false, skipEmptyLines: false });
+    const values = (parsed.data || [])
+        .flat()
+        .map(value => String(value || '').trim())
+        .filter(Boolean);
+
+    if (!values.length) return '';
+    if (values.length > 1 && values[0].toLowerCase() === headerName.toLowerCase()) {
+        return values[1] || '';
+    }
+    return values[0];
+}
+
+async function fetchLevelCodeForLevel(level) {
+    if (!level.rowNumber) return '';
+    const range = `J${level.rowNumber}:J${level.rowNumber}`;
+    const rangeUrl = `${sheetUrl}&range=${encodeURIComponent(range)}`;
+    const response = await fetch(rangeUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch level code (${response.status})`);
+    }
+    const text = await response.text();
+    return extractSingleCellValue(text, 'Level Code');
+}
+
+function renderModalLevelCode(code, state = 'ready') {
+    const codeContainer = document.getElementById('modalCodeContainer');
+    const codeInput = document.getElementById('modalCode');
+
+    if (state === 'loading') {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = 'Loading level code...';
+        codeInput.disabled = true;
+        return;
+    }
+
+    if (state === 'error') {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = 'Unable to load level code right now.';
+        codeInput.disabled = true;
+        return;
+    }
+
+    codeInput.disabled = false;
+    if (code?.trim()) {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = code;
+    } else {
+        codeContainer.style.display = 'none';
+        codeInput.style.display = 'none';
+        codeInput.value = '';
+    }
+}
+
+async function ensureLevelCodeLoaded(level) {
+    const id = String(level.id || '');
+    if (levelCodeCache.has(id)) {
+        return levelCodeCache.get(id);
+    }
+
+    if (levelCodeRequestCache.has(id)) {
+        return levelCodeRequestCache.get(id);
+    }
+
+    const request = fetchLevelCodeForLevel(level)
+        .then(code => {
+            levelCodeCache.set(id, code || '');
+            return code || '';
+        })
+        .finally(() => {
+            levelCodeRequestCache.delete(id);
+        });
+
+    levelCodeRequestCache.set(id, request);
+    return request;
+}
 
 document.getElementById('biasSlider').addEventListener('input', () => { 
     updateBiasLabel(); 
-    renderTable(); 
+    debouncedBiasRender(); 
 }); 
 updateBiasLabel();
 
@@ -277,14 +428,18 @@ const showImpossibleEl = document.getElementById('showImpossible');
 const showChallengeEl = document.getElementById('showChallenge');
 
 // Re-render table when checkboxes change
-showImpossibleEl.addEventListener('change', renderTable);
-showChallengeEl.addEventListener('change', renderTable);
+showImpossibleEl.addEventListener('change', scheduleRenderTable);
+showChallengeEl.addEventListener('change', scheduleRenderTable);
 
 function renderTable() {
-    console.log("Table rendered")
     const bias = document.getElementById('biasSlider').value;
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
+
+    if (thumbnailObserver) {
+        thumbnailObserver.disconnect();
+        thumbnailObserver = null;
+    }
 
     const showImpossible = showImpossibleEl.checked;
     const showChallenge = showChallengeEl.checked;
@@ -338,6 +493,8 @@ function renderTable() {
     updateHeaderImage(sorted[0]);
 
     const isVisualMode = visualModeCheckbox.checked;
+    const thumbnailTargets = [];
+    const fragment = document.createDocumentFragment();
     let index = 1;
     sorted.forEach(l => {
         const row = document.createElement('tr');
@@ -374,15 +531,48 @@ function renderTable() {
                  <td class='py-2 px-4'>${getQualityBadgeHtml(l.quality)}</td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
-        tbody.appendChild(row);
-        
-        // Load thumbnail asynchronously if visual mode is on and video exists
+        fragment.appendChild(row);
+
         if (isVisualMode && l.video && l.video.trim()) {
-            // Use setTimeout to ensure DOM is ready
-            setTimeout(() => {
-                loadThumbnailAsync(row, l.video);
-            }, 0);
+            row.dataset.videoUrl = l.video;
+            thumbnailTargets.push({ row, video: l.video });
         }
+    });
+
+    tbody.appendChild(fragment);
+
+    if (isVisualMode) {
+        setupLazyThumbnailLoading(thumbnailTargets);
+    }
+}
+
+function setupLazyThumbnailLoading(thumbnailTargets) {
+    if (!thumbnailTargets.length) return;
+
+    thumbnailTargets.forEach(({ row }, index) => {
+        if (index < THUMBNAIL_EAGER_COUNT) {
+            loadThumbnailAsync(row);
+        }
+    });
+
+    const deferredTargets = thumbnailTargets.slice(THUMBNAIL_EAGER_COUNT);
+    if (!deferredTargets.length) return;
+
+    thumbnailObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const row = entry.target;
+            thumbnailObserver.unobserve(row);
+            loadThumbnailAsync(row);
+        });
+    }, {
+        root: null,
+        rootMargin: '250px 0px',
+        threshold: 0.01
+    });
+
+    deferredTargets.forEach(({ row }) => {
+        thumbnailObserver.observe(row);
     });
 }
 
@@ -414,19 +604,23 @@ function normalizeModUrl(value) {
 }
 
 function loadThumbnailAsync(row, videoUrl) {
+    const sourceVideoUrl = videoUrl || row?.dataset?.videoUrl || '';
+    if (!sourceVideoUrl || row?.dataset?.thumbnailLoaded === '1') return;
+    row.dataset.thumbnailLoaded = '1';
+
     // If it's a direct image URL, use it immediately
-    if (isImageUrl(videoUrl)) {
+    if (isImageUrl(sourceVideoUrl)) {
         const thumbnailCell = row.querySelector('td:nth-child(3)');
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+                container.innerHTML = `<img src="${sourceVideoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
             }
         }
         return;
     }
 
-    const videoId = extractVideoId(videoUrl);
+    const videoId = extractVideoId(sourceVideoUrl);
     if (!videoId) {
         // If we can't extract video ID, show default thumbnail
         const thumbnailCell = row.querySelector('td:nth-child(3)');
@@ -451,7 +645,7 @@ function loadThumbnailAsync(row, videoUrl) {
         return;
     }
     
-    const thumbnailCandidates = getYoutubeThumbnailCandidates(videoUrl);
+    const thumbnailCandidates = getYoutubeThumbnailCandidates(sourceVideoUrl);
     let currentFormatIndex = 0;
 
     function tryNextFormat() {
@@ -526,11 +720,13 @@ function closeAllModals() {
     rulesModal.classList.add('hidden');
     leaderboardModal.classList.add('hidden');
     difficultyChartModal.classList.add('hidden');
+    activeModalLevelId = null;
 }
 
 
 function showModal(level) {
     closeAllModals();
+    activeModalLevelId = String(level.id || '');
     document.getElementById('modalName').innerText = level.name;
 
     const currentSystem = document.getElementById('systemSelect').value;
@@ -583,16 +779,7 @@ function showModal(level) {
         notesContainer.style.display = 'none';
     }
 
-    // Level Code
-    const codeContainer = document.getElementById('modalCodeContainer');
-    if (level.levelCode?.trim()) {
-        codeContainer.style.display = 'block';
-        document.getElementById('modalCode').style.display = 'block';
-        document.getElementById('modalCode').value = level.levelCode;
-    } else {
-        codeContainer.style.display = 'none';
-        document.getElementById('modalCode').style.display = 'none';
-    }
+    renderModalLevelCode('', 'loading');
 
     // Victors
     const victorsContainer = document.getElementById('modalVictorsContainer');
@@ -617,6 +804,16 @@ function showModal(level) {
     }
 
     modal.classList.remove('hidden');
+
+    ensureLevelCodeLoaded(level)
+        .then(code => {
+            if (activeModalLevelId !== String(level.id || '')) return;
+            renderModalLevelCode(code, 'ready');
+        })
+        .catch(() => {
+            if (activeModalLevelId !== String(level.id || '')) return;
+            renderModalLevelCode('', 'error');
+        });
 }
 
 
