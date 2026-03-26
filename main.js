@@ -181,12 +181,17 @@ function parseQualityValue(raw) {
     if (!text) return null;
     const n = Number(text);
     if (Number.isNaN(n)) return null;
-    return Math.max(0, Math.min(5, Math.round(n)));
+    const rounded = Math.round(n);
+    if (rounded === -1) return -1;
+    return Math.max(0, Math.min(5, rounded));
 }
 
 function getQualityBadgeHtml(qualityValue) {
     if (qualityValue === null || qualityValue === undefined) {
         return `<span class="inline-block px-2 py-1 rounded-full" style="background:#000000; color:#ffffff;">N/A</span>`;
+    }
+    if (qualityValue === -1) {
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:#111111; color:#ffffff;">💀 (-1)</span>`;
     }
     const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
     const value = Math.max(0, Math.min(5, qualityValue));
