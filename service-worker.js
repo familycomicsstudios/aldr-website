@@ -87,6 +87,6 @@ self.addEventListener('fetch', event => {
   }
 
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(request, APP_CACHE));
+    event.respondWith(networkFirst(request, APP_CACHE));
   }
 });
