@@ -209,6 +209,7 @@
       <p id="modalPlacementContainer"><strong>Placement:</strong> <span id="modalPlacement"></span></p>
       <p id="modalIdContainer"><strong>ALDR ID:</strong> <span id="modalId"></span></p>
       <p id="modalCreatorContainer"><strong>Creator:</strong> <span id="modalCreator"></span></p>
+      <p id="modalCountryContainer"><strong>Country:</strong> <img id="modalCountryFlag" alt="Country flag" class="w-8 h-5 inline-block align-middle rounded-sm border border-gray-600 object-cover mx-1"><span id="modalCountryText"></span></p>
       <p id="modalDifficultyCurrentContainer"><strong>Difficulty (Current Scale):</strong> <span id="modalDifficultyCurrent"></span></p>
       <p id="modalDifficultyPunterContainer"><strong>Difficulty (Punter):</strong> <span id="modalDifficultyPunter"></span></p>
       <p id="modalQualityContainer"><strong>Quality:</strong> <span id="modalQuality"></span></p>
@@ -238,7 +239,10 @@
   <div id="playerModal" class="fixed inset-0 flex items-center justify-center hidden">
     <div class="glass-panel modal-panel p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
       <button id="playerModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
-      <h2 id="playerName" class="text-xl font-bold mb-2"></h2>
+      <div class="mb-2 flex items-center gap-2">
+        <img id="playerCountryFlag" alt="Country flag" class="hidden w-8 h-5 rounded-sm border border-gray-600 object-cover">
+        <h2 id="playerNameText" class="text-xl font-bold"></h2>
+      </div>
       <p><strong>Total List Points:</strong> <span id="playerPoints"></span></p>
       <p><strong>Total Levels Beaten:</strong> <span id="playerLevels"></span></p>
       <p><strong>Skill:</strong> <span id="playerSkill"></span></p>
