@@ -16,10 +16,28 @@ let thumbnailObserver = null;
 let pendingRenderFrame = null;
 
 if ('serviceWorker' in navigator) {
+    let reloadForSwUpdate = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!reloadForSwUpdate) return;
+        reloadForSwUpdate = false;
+        window.location.reload();
+    });
+
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js').catch(error => {
-            console.warn('Service worker registration failed:', error);
-        });
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                if (!navigator.onLine) return;
+                if (!navigator.serviceWorker.controller) return;
+                reloadForSwUpdate = true;
+                return registration.update().catch(error => {
+                    reloadForSwUpdate = false;
+                    console.warn('Service worker update check failed:', error);
+                });
+            })
+            .catch(error => {
+                console.warn('Service worker registration failed:', error);
+            });
     });
 }
 
