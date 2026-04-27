@@ -4,9 +4,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ALDR">
   <title>Appel Level Difficulty Rankings</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/assets/icons/icon-512.png">
   <style>
     .chart-box .chart-label { opacity: 0; }
     .chart-box:hover .chart-label { opacity: 1; }
@@ -213,6 +222,7 @@
       <p id="modalPlacementContainer"><strong>Placement:</strong> <span id="modalPlacement"></span></p>
       <p id="modalIdContainer"><strong>ALDR ID:</strong> <span id="modalId"></span></p>
       <p id="modalCreatorContainer"><strong>Creator:</strong> <span id="modalCreator"></span></p>
+      <p id="modalCountryContainer"><strong>Country:</strong> <img id="modalCountryFlag" alt="Country flag" class="w-8 h-5 inline-block align-middle rounded-sm border border-gray-600 object-cover mx-1"><span id="modalCountryText"></span></p>
       <p id="modalDifficultyCurrentContainer"><strong>Difficulty (Current Scale):</strong> <span id="modalDifficultyCurrent"></span></p>
       <p id="modalDifficultyPunterContainer"><strong>Difficulty (Punter):</strong> <span id="modalDifficultyPunter"></span></p>
       <p id="modalQualityContainer"><strong>Quality:</strong> <span id="modalQuality"></span></p>
@@ -242,7 +252,10 @@
   <div id="playerModal" class="fixed inset-0 flex items-center justify-center hidden">
     <div class="glass-panel modal-panel p-6 rounded-lg w-1/2 max-h-[80vh] overflow-y-auto relative">
       <button id="playerModalClose" class="absolute top-2 right-2 text-gray-300 hover:text-white">✖</button>
-      <h2 id="playerName" class="text-xl font-bold mb-2"></h2>
+      <div class="mb-2 flex items-center gap-2">
+        <img id="playerCountryFlag" alt="Country flag" class="hidden w-8 h-5 rounded-sm border border-gray-600 object-cover">
+        <h2 id="playerNameText" class="text-xl font-bold"></h2>
+      </div>
       <p><strong>Total List Points:</strong> <span id="playerPoints"></span></p>
       <p><strong>Total Levels Beaten:</strong> <span id="playerLevels"></span></p>
       <p><strong>Skill:</strong> <span id="playerSkill"></span></p>
@@ -270,7 +283,7 @@
       <h3 class="text-xl font-bold mb-4">Level Rules</h3>
       <ul class="list-disc ml-5 space-y-2 text-gray-200">
         <li>Levels must be made in Appel to be eligible for ranking.</li>
-        <li>Levels must be beatable by at least one person, or they will be marked as Impossible.</li>
+        <li>Levels must be completed by a human player with proof, or they will be marked as Impossible.</li>
         <li>Levels with low-effort gameplay will be marked as Challenge levels.</li>
         <li>Levels must have either good gameplay or good decoration. A level with bad gameplay must have good decoration
           to be ranked, and vice versa. Levels will not be added if they have no effort put into them.
@@ -278,19 +291,30 @@
         <small><li>Levels that are extremely unique or notable may also be placed even if they do not meet quality standards,
           but this is rare and at the discretion of the list maintainers.
         </li></small>
+        <li>Final decisions about level approvals are up to moderator discretion.</li>
         <li>Levels must be submitted with a replay code from the Appel game, or whatever Appel mod the game was made with.</li>
         <li>Levels that do not work in the latest version of Appel must have the mod they are made in specified.</li>
+        <li>Levels can be later removed or edited to include the Impossible tag if the level is found
+          to be verified illegitimately or not verified, but are still possible to verify in the future.
+          Levels that are completely impossible to verify may be removed from the list entirely.
+        </li>
       </ul>
       <br>
       <h3 class="text-xl font-bold mb-4">List Points Rules</h3>
       <ul class="list-disc ml-5 space-y-2 text-gray-200">
         <li>Levels must be beaten in either vanilla Appel, the mod the level was created in, or a moderator-approved QOL mod.</li>
         <li>Levels must be beaten without macros or TAS, at 30FPS.</li>
-        <li>Levels must be beaten with no cheats or hacks - the replay must be unaltered and show the entire level being completed.</li>
-        <li>Levels may be beaten as a segmented run starting from a checkpoint, but this is not allowed if the level has any softlocks.</li>
+        <li>Levels must have proof of completion, such as a valid replay code, and/or a video of the level completion.</li>
+        <li>In some cases, levels may be completed by completing the level in segments divided by checkpoints. This method
+          is not allowed if the level has softlocks, or if the level's notes specify that it must be beaten in one run. (e.g.
+          the level Claustrophobia was beaten in segments by thepurplebanana66 as its verification)
+        </li>
         <li>If the level's notes specify that the level must be played in the project, the run must be done in that project - not Vanilla Appel
           nor an approved QOL mod for Vanilla Appel. QOL mods for that specific project are still allowed, however.</li>
       </ul>
+      <div class="mt-4 text-right">
+        <a href="assets/markmywords.jpg" target="_blank" rel="noopener noreferrer" class="text-[10px] text-gray-500 opacity-25 hover:opacity-60 hover:text-gray-400 transition-opacity">mark my words</a>
+      </div>
     </div>
   </div>
 

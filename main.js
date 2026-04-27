@@ -4,12 +4,67 @@ const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZEUcAFIiGmz
 let levels = [];
 let modUrlMap = new Map();
 let lastRenderedLevels = [];
+const initialRanges = ['A:O', 'AB:AC'];
+const levelCodeCache = new Map();
+const levelCodeRequestCache = new Map();
+const playerMetadataCache = new Map();
+const playerMetadataRequestCache = new Map();
+let activeModalLevelId = null;
+let activePlayerModalName = null;
+const THUMBNAIL_EAGER_COUNT = 20;
+let thumbnailObserver = null;
+let pendingRenderFrame = null;
+
+if ('serviceWorker' in navigator) {
+    let reloadForSwUpdate = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!reloadForSwUpdate) return;
+        reloadForSwUpdate = false;
+        window.location.reload();
+    });
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                if (!navigator.onLine) return;
+                if (!navigator.serviceWorker.controller) return;
+                reloadForSwUpdate = true;
+                return registration.update().catch(error => {
+                    reloadForSwUpdate = false;
+                    console.warn('Service worker update check failed:', error);
+                });
+            })
+            .catch(error => {
+                console.warn('Service worker registration failed:', error);
+            });
+    });
+}
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
 const modSelect = document.getElementById('modSelect');
 const visualModeCheckbox = document.getElementById('visualMode');
 const lowDefinitionModeCheckbox = document.getElementById('lowDefinitionMode');
+
+function debounce(callback, delayMs) {
+    let timeoutId = null;
+    return (...args) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => callback(...args), delayMs);
+    };
+}
+
+function scheduleRenderTable() {
+    if (pendingRenderFrame !== null) return;
+    pendingRenderFrame = requestAnimationFrame(() => {
+        pendingRenderFrame = null;
+        renderTable();
+    });
+}
+
+const debouncedSearchRender = debounce(scheduleRenderTable, 120);
+const debouncedBiasRender = debounce(scheduleRenderTable, 80);
 
 function getYoutubeThumbnail(videoUrl) {
     if (!videoUrl || !videoUrl.trim()) return null;
@@ -19,6 +74,72 @@ function getYoutubeThumbnail(videoUrl) {
     // Handle various YouTube URL formats
     const match = videoUrl.trim().match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/);
     return match ? `https://img.youtube.com/vi/${match[1]}/maxresdefault.jpg` : null;
+}
+
+function normalizeCountryCode(value) {
+    return String(value || '')
+        .trim()
+        .replace(/_/g, '-')
+        .replace(/\s+/g, '-')
+        .toLowerCase();
+}
+
+function getCountryFlagUrl(countryCode) {
+    const normalized = normalizeCountryCode(countryCode);
+    return normalized ? `/assets/country-flags-main/svg/${normalized}.svg` : '';
+}
+
+function getCountryFlagHtml(countryCode, sizeClass = 'w-6 h-4') {
+    const normalized = normalizeCountryCode(countryCode);
+    if (!normalized) return '';
+    const flagUrl = getCountryFlagUrl(countryCode);
+    const label = normalized.toUpperCase();
+    return `<img src="${flagUrl}" alt="${label} flag" class="${sizeClass} inline-block align-middle rounded-sm border border-gray-600 object-cover">`;
+}
+
+async function getPlayerMetadata(playerName) {
+    const normalizedName = String(playerName || '').trim().toLowerCase();
+    if (!normalizedName) {
+        return { scratchUsername: '', countryCode: '' };
+    }
+
+    if (playerMetadataCache.has(normalizedName)) {
+        return playerMetadataCache.get(normalizedName);
+    }
+
+    if (playerMetadataRequestCache.has(normalizedName)) {
+        return playerMetadataRequestCache.get(normalizedName);
+    }
+
+    const request = (async () => {
+        const response = await fetch(sheetUrl);
+        const text = await response.text();
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        const row = parsed.data.find(entry => entry['Tracker Username']?.trim().toLowerCase() === normalizedName);
+
+        const scratchField = row?.['Scratch Username']?.trim();
+        const metadata = {
+            scratchUsername: scratchField || playerName,
+            countryCode: normalizeCountryCode(row?.['Country Code'])
+        };
+
+        playerMetadataCache.set(normalizedName, metadata);
+        return metadata;
+    })().finally(() => {
+        playerMetadataRequestCache.delete(normalizedName);
+    });
+
+    playerMetadataRequestCache.set(normalizedName, request);
+    return request;
+}
+
+function loadImageFromUrl(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+        img.src = src;
+    });
 }
 
 function getYoutubeThumbnailCandidates(videoUrl) {
@@ -94,6 +215,7 @@ function updateTableHeader() {
         ${isVisualMode ? '<th class="py-2 px-4 border-b border-gray-600">Thumbnail</th>' : ''}
         <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[12rem]">Level Name</th>
         <th class="py-2 px-4 border-b border-gray-600">Creator</th>
+        <th class="py-2 px-4 border-b border-gray-600">Country</th>
         <th class="py-2 px-4 border-b border-gray-600 whitespace-nowrap min-w-[11rem]">Difficulty</th>
         <th class="py-2 px-4 border-b border-gray-600">Quality</th>
         <th class="py-2 px-4 border-b border-gray-600">List Points</th>
@@ -101,18 +223,18 @@ function updateTableHeader() {
 }
 
 // Re-render table on input
-searchInput.addEventListener('input', renderTable);
-sortSelect.addEventListener('change', renderTable);
+searchInput.addEventListener('input', debouncedSearchRender);
+sortSelect.addEventListener('change', scheduleRenderTable);
 if (modSelect) {
-    modSelect.addEventListener('change', renderTable);
+    modSelect.addEventListener('change', scheduleRenderTable);
 }
 
 document.getElementById('systemSelect')
-    .addEventListener('change', () => renderTable());
+    .addEventListener('change', scheduleRenderTable);
 
 visualModeCheckbox.addEventListener('change', () => {
     updateTableHeader();
-    renderTable();
+    scheduleRenderTable();
 });
 
 function updateLowDefinitionMode() {
@@ -127,47 +249,172 @@ if (lowDefinitionModeCheckbox) {
 // Initialize table header
 updateTableHeader();
 
-// Fetch CSV and parse with PapaParse
-fetch(sheetUrl)
-    .then(res => res.text())
-    .then(text => {
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-        parsed.data.forEach(r => {
-            if (!r['ALDR ID']?.trim()) return;
+loadLevels();
 
-            const victorsRaw = r['Victors'] || '';
-            const modName = (r['Mod Name'] || '').trim();
-            const modUrl = normalizeModUrl(r['Mod URL']);
-            if (modName && modUrl && !modUrlMap.has(modUrl)) {
-                modUrlMap.set(modUrl, modName);
-            }
+async function loadLevels() {
+    try {
+        const [levelRows, modRows] = await Promise.all(
+            initialRanges.map(fetchRowsForRange)
+        );
+        parseAndStoreLevels(levelRows, modRows);
+    } catch (error) {
+        console.warn('Range-based fetch failed, falling back to full sheet fetch.', error);
+        const fullRows = await fetchRowsFromUrl(sheetUrl);
+        parseAndStoreLevels(fullRows, []);
+    }
 
-            levels.push({
-                id: r['ALDR ID'],
-                name: r['Level Name'],
-                creator: r['Level Creator'],
-                modProject: r['Project'] || '',
-                modUrl: normalizeModUrl(r['Project']),
-                punter: parseFloat(r['Punter Scale Difficulty']) || 0,
-                skillBalance: parseFloat(r['Skills Balance']) || 0,
-                project: r['Project'] || '',
-                points: parseFloat(r['List Points']) || 0,
-                video: r['Video'] || '',
-                notes: r['Notes'] || '',
-                levelCode: r['Level Code'] || '',
-                quality: parseQualityValue(r['Quality']),
-                victors: victorsRaw ? victorsRaw.split(',').map(v => v.trim()) : [],
-                impossible: r['Impossible?'] === '1',
-                challenge: r['Challenge?'] === '1'
-            });
-        });
-        populateModSelect();
-        renderTable();
+    populateModSelect();
+    renderTable();
+}
+
+async function fetchRowsForRange(range) {
+    const rangeUrl = `${sheetUrl}&range=${encodeURIComponent(range)}`;
+    return fetchRowsFromUrl(rangeUrl);
+}
+
+async function fetchRowsFromUrl(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch sheet data (${response.status})`);
+    }
+    const text = await response.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: false });
+    return parsed.data || [];
+}
+
+function parseAndStoreLevels(levelRows, modRows = []) {
+    levels = [];
+    modUrlMap = new Map();
+
+    modRows.forEach(row => {
+        const modUrl = normalizeModUrl(row['Mod URL']);
+        const modName = String(row['Mod Name'] || '').trim();
+        if (!modUrl) return;
+        if (!modUrlMap.has(modUrl)) {
+            modUrlMap.set(modUrl, modName);
+        }
     });
+
+    const rowCount = levelRows.length;
+    for (let index = 0; index < rowCount; index += 1) {
+        const mergedRow = levelRows[index] || {};
+
+        if (!mergedRow['ALDR ID']?.trim()) continue;
+
+        const victorsRaw = mergedRow['Victors'] || '';
+
+        levels.push({
+            id: mergedRow['ALDR ID'],
+            rowNumber: index + 2,
+            name: mergedRow['Level Name'],
+            creator: mergedRow['Level Creator'],
+            modProject: mergedRow['Project'] || '',
+            modUrl: normalizeModUrl(mergedRow['Project']),
+            countryCode: normalizeCountryCode(mergedRow['Country Code']),
+            punter: parseFloat(mergedRow['Punter Scale Difficulty']) || 0,
+            skillBalance: parseFloat(mergedRow['Skills Balance']) || 0,
+            project: mergedRow['Project'] || '',
+            points: parseFloat(mergedRow['List Points']) || 0,
+            video: mergedRow['Video'] || '',
+            notes: mergedRow['Notes'] || '',
+            quality: parseQualityValue(mergedRow['Quality']),
+            victors: victorsRaw ? victorsRaw.split(',').map(v => v.trim()) : [],
+            impossible: mergedRow['Impossible?'] === '1',
+            challenge: mergedRow['Challenge?'] === '1'
+        });
+    }
+}
+
+function extractSingleCellValue(csvText, headerName) {
+    const parsed = Papa.parse(csvText, { header: false, skipEmptyLines: false });
+    const values = (parsed.data || [])
+        .flat()
+        .map(value => String(value || '').trim())
+        .filter(Boolean);
+
+    if (!values.length) return '';
+    if (values.length > 1 && values[0].toLowerCase() === headerName.toLowerCase()) {
+        return values[1] || '';
+    }
+    return values[0];
+}
+
+async function fetchLevelCodeForLevel(level) {
+    const rows = await fetchSheetRowsByHeader();
+    const match = rows.find(row => String(row['ALDR ID'] || '').trim() === String(level.id || '').trim());
+    return String(match?.['Level Code'] || '').trim();
+}
+
+let sheetRowsByHeaderPromise = null;
+
+async function fetchSheetRowsByHeader() {
+    if (!sheetRowsByHeaderPromise) {
+        sheetRowsByHeaderPromise = fetchRowsFromUrl(sheetUrl).catch(error => {
+            sheetRowsByHeaderPromise = null;
+            throw error;
+        });
+    }
+    return sheetRowsByHeaderPromise;
+}
+
+function renderModalLevelCode(code, state = 'ready') {
+    const codeContainer = document.getElementById('modalCodeContainer');
+    const codeInput = document.getElementById('modalCode');
+
+    if (state === 'loading') {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = 'Loading level code...';
+        codeInput.disabled = true;
+        return;
+    }
+
+    if (state === 'error') {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = 'Unable to load level code right now.';
+        codeInput.disabled = true;
+        return;
+    }
+
+    codeInput.disabled = false;
+    if (code?.trim()) {
+        codeContainer.style.display = 'block';
+        codeInput.style.display = 'block';
+        codeInput.value = code;
+    } else {
+        codeContainer.style.display = 'none';
+        codeInput.style.display = 'none';
+        codeInput.value = '';
+    }
+}
+
+async function ensureLevelCodeLoaded(level) {
+    const id = String(level.id || '');
+    if (levelCodeCache.has(id)) {
+        return levelCodeCache.get(id);
+    }
+
+    if (levelCodeRequestCache.has(id)) {
+        return levelCodeRequestCache.get(id);
+    }
+
+    const request = fetchLevelCodeForLevel(level)
+        .then(code => {
+            levelCodeCache.set(id, code || '');
+            return code || '';
+        })
+        .finally(() => {
+            levelCodeRequestCache.delete(id);
+        });
+
+    levelCodeRequestCache.set(id, request);
+    return request;
+}
 
 document.getElementById('biasSlider').addEventListener('input', () => { 
     updateBiasLabel(); 
-    renderTable(); 
+    debouncedBiasRender(); 
 }); 
 updateBiasLabel();
 
@@ -181,12 +428,17 @@ function parseQualityValue(raw) {
     if (!text) return null;
     const n = Number(text);
     if (Number.isNaN(n)) return null;
-    return Math.max(0, Math.min(5, Math.round(n)));
+    const rounded = Math.round(n);
+    if (rounded === -1) return -1;
+    return Math.max(0, Math.min(5, rounded));
 }
 
 function getQualityBadgeHtml(qualityValue) {
     if (qualityValue === null || qualityValue === undefined) {
         return `<span class="inline-block px-2 py-1 rounded-full" style="background:#000000; color:#ffffff;">N/A</span>`;
+    }
+    if (qualityValue === -1) {
+        return `<span class="inline-block px-2 py-1 rounded-full" style="background:#111111; color:#ffffff;">💀 (-1)</span>`;
     }
     const labels = ['F', 'D', 'C', 'B', 'A', 'S'];
     const value = Math.max(0, Math.min(5, qualityValue));
@@ -272,14 +524,18 @@ const showImpossibleEl = document.getElementById('showImpossible');
 const showChallengeEl = document.getElementById('showChallenge');
 
 // Re-render table when checkboxes change
-showImpossibleEl.addEventListener('change', renderTable);
-showChallengeEl.addEventListener('change', renderTable);
+showImpossibleEl.addEventListener('change', scheduleRenderTable);
+showChallengeEl.addEventListener('change', scheduleRenderTable);
 
 function renderTable() {
-    console.log("Table rendered")
     const bias = document.getElementById('biasSlider').value;
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
+
+    if (thumbnailObserver) {
+        thumbnailObserver.disconnect();
+        thumbnailObserver = null;
+    }
 
     const showImpossible = showImpossibleEl.checked;
     const showChallenge = showChallengeEl.checked;
@@ -292,10 +548,11 @@ function renderTable() {
         if (!showImpossible && l.impossible) return false;
         if (!showChallenge && l.challenge) return false;
         if (selectedMod === 'none') {
-            if (l.modUrl) return false;
+            if (l.modUrl && modUrlMap.has(l.modUrl)) return false;
         } else if (selectedMod !== 'all') {
             const normalizedSelected = normalizeModUrl(selectedMod);
-            if (!l.modUrl || l.modUrl.toLowerCase() !== normalizedSelected.toLowerCase()) return false;
+            const levelProjectUrl = normalizeModUrl(l.project);
+            if (!levelProjectUrl || levelProjectUrl.toLowerCase() !== normalizedSelected.toLowerCase()) return false;
         }
         if (searchTerm) {
             const haystack = `${l.name} ${l.creator} ${l.id}`.toLowerCase();
@@ -333,6 +590,8 @@ function renderTable() {
     updateHeaderImage(sorted[0]);
 
     const isVisualMode = visualModeCheckbox.checked;
+    const thumbnailTargets = [];
+    const fragment = document.createDocumentFragment();
     let index = 1;
     sorted.forEach(l => {
         const row = document.createElement('tr');
@@ -365,43 +624,88 @@ function renderTable() {
                  ${thumbnailCell}
                  <td class='py-2 px-4 whitespace-nowrap min-w-[12rem]'>${l.name}</td>
                  <td class='py-2 px-4'>${l.creator}</td>
+                     <td class='py-2 px-4'>${getCountryFlagHtml(l.countryCode)}</td>
                  <td class='py-2 px-4 whitespace-nowrap min-w-[11rem]'>${getDifficultyDisplayHtml(l.punter, document.getElementById('systemSelect').value, isVisualMode)}</td>
                  <td class='py-2 px-4'>${getQualityBadgeHtml(l.quality)}</td>
                  <td class='py-2 px-4'>${displayNumber(score(l, bias))}</td>`;
         row.addEventListener('click', () => { closeAllModals(); showModal(l); });
-        tbody.appendChild(row);
-        
-        // Load thumbnail asynchronously if visual mode is on and video exists
+        fragment.appendChild(row);
+
         if (isVisualMode && l.video && l.video.trim()) {
-            // Use setTimeout to ensure DOM is ready
-            setTimeout(() => {
-                loadThumbnailAsync(row, l.video);
-            }, 0);
+            row.dataset.videoUrl = l.video;
+            thumbnailTargets.push({ row, video: l.video });
         }
+    });
+
+    tbody.appendChild(fragment);
+
+    if (isVisualMode) {
+        setupLazyThumbnailLoading(thumbnailTargets);
+    }
+}
+
+function setupLazyThumbnailLoading(thumbnailTargets) {
+    if (!thumbnailTargets.length) return;
+
+    thumbnailTargets.forEach(({ row }, index) => {
+        if (index < THUMBNAIL_EAGER_COUNT) {
+            loadThumbnailAsync(row);
+        }
+    });
+
+    const deferredTargets = thumbnailTargets.slice(THUMBNAIL_EAGER_COUNT);
+    if (!deferredTargets.length) return;
+
+    thumbnailObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const row = entry.target;
+            thumbnailObserver.unobserve(row);
+            loadThumbnailAsync(row);
+        });
+    }, {
+        root: null,
+        rootMargin: '250px 0px',
+        threshold: 0.01
+    });
+
+    deferredTargets.forEach(({ row }) => {
+        thumbnailObserver.observe(row);
     });
 }
 
 function populateModSelect() {
     if (!modSelect) return;
 
-    const existingOptions = Array.from(modSelect.querySelectorAll('option'))
-        .map(option => option.value);
+    const currentValue = modSelect.value;
+    const baseOptions = Array.from(modSelect.querySelectorAll('option'))
+        .filter(option => option.value === 'all' || option.value === 'none')
+        .map(option => ({ value: option.value, text: option.textContent || '' }));
 
-    const modUrls = Array.from(new Set(
-        levels
-            .map(level => normalizeModUrl(level.modUrl))
-            .filter(url => url.length > 0)
-    )).sort((a, b) => a.localeCompare(b));
+    const modUrls = Array.from(modUrlMap.keys());
+
+    modSelect.innerHTML = '';
+
+    baseOptions.forEach(({ value, text }) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        modSelect.appendChild(option);
+    });
 
     modUrls.forEach(url => {
-        if (existingOptions.includes(url)) return;
         const option = document.createElement('option');
         option.value = url;
-        option.textContent = modUrlMap.get(url) || url;
+        const modName = modUrlMap.get(url);
+        option.textContent = modName || url;
         option.dataset.url = url;
         option.title = url;
         modSelect.appendChild(option);
     });
+
+    if (Array.from(modSelect.options).some(option => option.value === currentValue)) {
+        modSelect.value = currentValue;
+    }
 }
 
 function normalizeModUrl(value) {
@@ -409,19 +713,23 @@ function normalizeModUrl(value) {
 }
 
 function loadThumbnailAsync(row, videoUrl) {
+    const sourceVideoUrl = videoUrl || row?.dataset?.videoUrl || '';
+    if (!sourceVideoUrl || row?.dataset?.thumbnailLoaded === '1') return;
+    row.dataset.thumbnailLoaded = '1';
+
     // If it's a direct image URL, use it immediately
-    if (isImageUrl(videoUrl)) {
+    if (isImageUrl(sourceVideoUrl)) {
         const thumbnailCell = row.querySelector('td:nth-child(3)');
         if (thumbnailCell) {
             const container = thumbnailCell.querySelector('div');
             if (container) {
-                container.innerHTML = `<img src="${videoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
+                container.innerHTML = `<img src="${sourceVideoUrl}" alt="Video thumbnail" class="w-full h-full object-cover">`;
             }
         }
         return;
     }
 
-    const videoId = extractVideoId(videoUrl);
+    const videoId = extractVideoId(sourceVideoUrl);
     if (!videoId) {
         // If we can't extract video ID, show default thumbnail
         const thumbnailCell = row.querySelector('td:nth-child(3)');
@@ -446,7 +754,7 @@ function loadThumbnailAsync(row, videoUrl) {
         return;
     }
     
-    const thumbnailCandidates = getYoutubeThumbnailCandidates(videoUrl);
+    const thumbnailCandidates = getYoutubeThumbnailCandidates(sourceVideoUrl);
     let currentFormatIndex = 0;
 
     function tryNextFormat() {
@@ -521,11 +829,14 @@ function closeAllModals() {
     rulesModal.classList.add('hidden');
     leaderboardModal.classList.add('hidden');
     difficultyChartModal.classList.add('hidden');
+    activeModalLevelId = null;
+    activePlayerModalName = null;
 }
 
 
 function showModal(level) {
     closeAllModals();
+    activeModalLevelId = String(level.id || '');
     document.getElementById('modalName').innerText = level.name;
 
     const currentSystem = document.getElementById('systemSelect').value;
@@ -533,6 +844,21 @@ function showModal(level) {
     document.getElementById('modalPlacement').innerText = placement ? `#${placement}` : 'N/A';
     document.getElementById('modalId').innerText = level.id || 'N/A';
     document.getElementById('modalCreator').innerText = level.creator || 'N/A';
+    const countryContainer = document.getElementById('modalCountryContainer');
+    const countryFlag = document.getElementById('modalCountryFlag');
+    const countryText = document.getElementById('modalCountryText');
+    if (level.countryCode) {
+        countryContainer.style.display = 'block';
+        countryFlag.src = getCountryFlagUrl(level.countryCode);
+        countryFlag.alt = `${level.countryCode.toUpperCase()} flag`;
+        countryText.innerText = level.countryCode.toUpperCase();
+        countryFlag.style.display = 'inline-block';
+        countryText.style.display = 'inline';
+    } else {
+        countryContainer.style.display = 'none';
+        countryFlag.removeAttribute('src');
+        countryText.innerText = '';
+    }
     document.getElementById('modalDifficultyCurrent').innerHTML = getDifficultyDisplayHtml(level.punter, currentSystem, false);
     document.getElementById('modalDifficultyPunter').innerHTML = getDifficultyDisplayHtml(level.punter, 'punter', false);
     document.getElementById('modalQuality').innerHTML = getQualityBadgeHtml(level.quality);
@@ -578,16 +904,7 @@ function showModal(level) {
         notesContainer.style.display = 'none';
     }
 
-    // Level Code
-    const codeContainer = document.getElementById('modalCodeContainer');
-    if (level.levelCode?.trim()) {
-        codeContainer.style.display = 'block';
-        document.getElementById('modalCode').style.display = 'block';
-        document.getElementById('modalCode').value = level.levelCode;
-    } else {
-        codeContainer.style.display = 'none';
-        document.getElementById('modalCode').style.display = 'none';
-    }
+    renderModalLevelCode('', 'loading');
 
     // Victors
     const victorsContainer = document.getElementById('modalVictorsContainer');
@@ -612,12 +929,43 @@ function showModal(level) {
     }
 
     modal.classList.remove('hidden');
+
+    ensureLevelCodeLoaded(level)
+        .then(code => {
+            if (activeModalLevelId !== String(level.id || '')) return;
+            renderModalLevelCode(code, 'ready');
+        })
+        .catch(() => {
+            if (activeModalLevelId !== String(level.id || '')) return;
+            renderModalLevelCode('', 'error');
+        });
 }
 
 
-function showPlayerModal(playerName) {
+async function showPlayerModal(playerName) {
     closeAllModals();
-    document.getElementById('playerName').innerText = playerName;
+    activePlayerModalName = String(playerName || '').trim().toLowerCase();
+    const playerNameText = document.getElementById('playerNameText');
+    const playerCountryFlag = document.getElementById('playerCountryFlag');
+    playerNameText.innerText = playerName;
+    playerCountryFlag.classList.add('hidden');
+    playerCountryFlag.removeAttribute('src');
+    playerCountryFlag.alt = 'Country flag';
+
+    getPlayerMetadata(playerName)
+        .then(metadata => {
+            if (activePlayerModalName !== String(playerName || '').trim().toLowerCase()) return;
+            if (metadata.countryCode) {
+                playerCountryFlag.src = getCountryFlagUrl(metadata.countryCode);
+                playerCountryFlag.alt = `${metadata.countryCode.toUpperCase()} flag`;
+                playerCountryFlag.classList.remove('hidden');
+            }
+        })
+        .catch(() => {
+            if (activePlayerModalName !== String(playerName || '').trim().toLowerCase()) return;
+            playerCountryFlag.classList.add('hidden');
+            playerCountryFlag.removeAttribute('src');
+        });
     
     // Hide the profile card when opening a new player
     document.getElementById('profileCardContainer').classList.add('hidden');
@@ -706,40 +1054,26 @@ async function generateProfileCard(playerName, playerLevels) {
     try {
         console.log('Generating profile card for:', playerName);
         
+        const metadata = await getPlayerMetadata(playerName).catch(() => ({
+            scratchUsername: playerName,
+            countryCode: ''
+        }));
+
         // Find user data from sheet using Papa.parse like the main levels loading
-        let scratchUsername = null;
+        let scratchUsername = metadata.scratchUsername || playerName;
+        const countryCode = metadata.countryCode || '';
         let avatarUrl = null;
-        
-        try {
-            console.log('Fetching sheet for user data...');
-            const response = await fetch(sheetUrl);
-            const text = await response.text();
-            
-            console.log('Parsing sheet with Papa.parse...');
-            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-            console.log('Sheet parsed, found', parsed.data.length, 'rows');
-            
-            // Find the user by Tracker Username column
-            for (let row of parsed.data) {
-                console.log('Checking row - Tracker Username:', row['Tracker Username'], 'Scratch Username:', row['Scratch Username']);
-                if (row['Tracker Username']?.toLowerCase() === playerName.toLowerCase()) {
-                    // Try to get Scratch Username, fall back to playerName if empty or missing
-                    const scratchField = row['Scratch Username']?.trim();
-                    scratchUsername = (scratchField && scratchField.length > 0) ? scratchField : playerName;
-                    console.log('Found user! Scratch Username:', scratchUsername);
-                    break;
-                }
-            }
-            
-            // If user not found in sheet, use playerName as fallback
-            if (!scratchUsername) {
-                scratchUsername = playerName;
-            }
-        } catch (e) {
-            console.error('Error fetching/parsing sheet for user data:', e);
-        }
-        
         console.log('Final Scratch Username:', scratchUsername);
+        console.log('Final Country Code:', countryCode);
+
+        let countryFlagImage = null;
+        if (countryCode) {
+            try {
+                countryFlagImage = await loadImageFromUrl(getCountryFlagUrl(countryCode));
+            } catch (e) {
+                console.log('Country flag image failed to load:', e.message);
+            }
+        }
         
         // Get Scratch avatar if we have a username
         if (scratchUsername) {
@@ -812,7 +1146,7 @@ async function generateProfileCard(playerName, playerLevels) {
         // Accent border removed
         
         // Draw profile card text and attempt to load avatar
-        drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings);
+        drawProfileCardText(ctx, playerName, hardestLevel, playerLevels.length, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings, countryFlagImage);
         
         // Try to load and draw avatar
         if (avatarUrl) {
@@ -862,11 +1196,15 @@ async function generateProfileCard(playerName, playerLevels) {
     }
 }
 
-function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings) {
+function drawProfileCardText(ctx, playerName, hardestLevel, levelCount, totalPoints, casualWeighted, competitiveWeighted, skill, difficultyBreakdown, rankings, countryFlagImage) {
     // Username
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 34px "Trebuchet MS", "Segoe UI", Arial';
-    ctx.fillText(playerName, 180, 80);
+    const nameX = countryFlagImage ? 214 : 180;
+    if (countryFlagImage) {
+        ctx.drawImage(countryFlagImage, 180, 53, 28, 18);
+    }
+    ctx.fillText(playerName, nameX, 80);
     
     // Hardest completion
     ctx.fillStyle = '#94a3b8';
